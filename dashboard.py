@@ -11,7 +11,7 @@ load_dotenv()
 
 DISCORD_CLIENT_ID     = os.getenv("DISCORD_CLIENT_ID", "")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "")
-DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/callback")
+DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000") + "/callback")
 BOT_OWNER_ID          = int(os.getenv("BOT_OWNER_ID", "0"))
 SECRET_KEY            = os.getenv("SECRET_KEY", "geheim123")
 GUILD_ID              = int(os.getenv("GUILD_ID", "0"))
@@ -758,12 +758,12 @@ async def index(request: Request):
 </div>
 <script>
 const p=document.getElementById('particles');
-for(let i=0;i<25;i++){{
+for(let i=0;i<25;i++){
   const d=document.createElement('div');d.className='particle';
   const s=Math.random()*8+2;
-  d.style.cssText=`width:${{s}}px;height:${{s}}px;left:${{Math.random()*100}}%;bottom:-10px;background:rgba(${{Math.random()>.5?'220,38,38':'248,113,113'}},${{Math.random()*.3+.05}});animation-duration:${{Math.random()*20+10}}s;animation-delay:${{Math.random()*15}}s;`;
+  d.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;bottom:-10px;background:rgba(${Math.random()>.5?'220,38,38':'248,113,113'},${Math.random()*.3+.05});animation-duration:${Math.random()*20+10}s;animation-delay:${Math.random()*15}s;`;
   p.appendChild(d);
-}}
+}
 </script>
 </body></html>""")
 

@@ -23,23 +23,27 @@ async def health():
 
 def starte_webserver():
     from dashboard import app as dashboard_app
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", "8000"))
     uvicorn.run(dashboard_app, host="0.0.0.0", port=port, log_level="warning")
 
 async def keep_alive():
     url = os.getenv("RENDER_EXTERNAL_URL", "")
     if not url:
+        print("⚠️ RENDER_EXTERNAL_URL nicht gesetzt, Keep-alive deaktiviert")
         return
-    await asyncio.sleep(60)
+    await asyncio.sleep(30)
     while True:
         try:
             import aiohttp
             async with aiohttp.ClientSession() as s:
-                await s.get(f"{url}/health")
-                print("🏓 Keep-alive ping")
+                async with s.get(f"{url}/health", timeout=aiohttp.ClientTimeout(total=10)) as r:
+                    if r.status == 200:
+                        print("🏓 Keep-alive ping erfolgreich")
+        except asyncio.TimeoutError:
+            print("⚠️ Keep-alive Timeout")
         except Exception as e:
             print(f"⚠️ Keep-alive Fehler: {e}")
-        await asyncio.sleep(240)
+        await asyncio.sleep(540)
 
 # ── MongoDB ────────────────────────────────────────────────────
 mongo = AsyncIOMotorClient(os.getenv("MONGODB_URI"))
@@ -158,7 +162,7 @@ async def on_member_join(member: discord.Member):
         age = (datetime.utcnow() - member.created_at.replace(tzinfo=None)).total_seconds() / 60
         if age < slow_joiner_minutes:
             try:
-                await member.send(f"Dein Account ist zu neu. Komm in {slow_min} Minuten wieder.")
+                await member.send(f"Dein Account ist zu neu. Komm in {slow_joiner_minutes} Minuten wieder.")
                 await member.kick(reason="Account zu neu (Slow Joiner Protection)")
             except: pass
             return
