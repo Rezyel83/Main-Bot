@@ -1,6 +1,7 @@
 import os, math, hashlib, hmac, time
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -717,7 +718,7 @@ def build_page(uid, username, avatar):
   </div>
   <div class="nav-credit">Made by <strong style="color:var(--accent2);">Rezyel83</strong> ❤️ AI</div>
   <div class="nav-user">
-    {'<img src="'+avatar+'" onerror="this.style.display=\'none\'">' if avatar else ''}
+    {f'<img src="{avatar}" onerror="this.style.display=\\"none\\"">' if avatar else ''}
     <span style="font-weight:700;">{username}</span>
     <a href="/logout" class="nav-logout">Ausloggen</a>
   </div>
@@ -735,11 +736,11 @@ def build_page(uid, username, avatar):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     if get_uid(request): return RedirectResponse("/dashboard")
-    return HTMLResponse(f"""<!DOCTYPE html>
+    login_html = """<!DOCTYPE html>
 <html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RLD Main Bot</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-<style>{CSS}
+<style>{css}
 .particle{{position:absolute;border-radius:50%;animation:rise linear infinite;}}
 @keyframes rise{{0%{{transform:translateY(100vh) rotate(0deg);opacity:0}}10%{{opacity:.6}}90%{{opacity:.6}}100%{{transform:translateY(-100px) rotate(360deg);opacity:0}}}}
 </style></head>
@@ -750,7 +751,7 @@ async def index(request: Request):
   <h1 style="font-size:2.2rem;font-weight:900;margin-bottom:10px;background:linear-gradient(135deg,var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">RLD Main Bot</h1>
   <p style="color:var(--muted);margin-bottom:8px;font-size:15px;line-height:1.6;">Das offizielle Admin-Dashboard für den</p>
   <p style="color:var(--accent2);font-weight:800;font-size:16px;margin-bottom:32px;">🚗 Rocket League Deutschland Server</p>
-  <a href="https://discord.com/oauth2/authorize?client_id={DISCORD_CLIENT_ID}&redirect_uri={DISCORD_REDIRECT_URI}&response_type=code&scope=identify" class="btn-discord" style="background:linear-gradient(135deg,var(--accent),#991b1b);box-shadow:0 8px 24px rgba(220,38,38,.4);">
+  <a href="https://discord.com/oauth2/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=identify" class="btn-discord" style="background:linear-gradient(135deg,var(--accent),#991b1b);box-shadow:0 8px 24px rgba(220,38,38,.4);">
     <svg width="22" height="22" viewBox="0 0 71 55" fill="white"><path d="M60.1 4.9A58.5 58.5 0 0045.6 1a40 40 0 00-1.8 3.6 54.2 54.2 0 00-16.2 0A40 40 0 0025.8 1 58.3 58.3 0 0011.3 5C1.6 19.7-1 34 .3 48a59 59 0 0017.9 9 42.4 42.4 0 003.7-5.9 38.3 38.3 0 01-5.8-2.8l1.4-1.1a42 42 0 0036 0l1.4 1.1a38.4 38.4 0 01-5.8 2.8 42 42 0 003.6 6 58.8 58.8 0 0018-9.1C72.2 32 68.4 17.7 60.1 4.9zM23.8 39.3c-3.5 0-6.4-3.2-6.4-7.1s2.8-7.1 6.4-7.1c3.5 0 6.4 3.2 6.3 7.1 0 3.9-2.8 7.1-6.3 7.1zm23.4 0c-3.5 0-6.4-3.2-6.4-7.1s2.8-7.1 6.4-7.1c3.5 0 6.4 3.2 6.3 7.1 0 3.9-2.8 7.1-6.3 7.1z"/></svg>
     Mit Discord einloggen
   </a>
@@ -758,14 +759,15 @@ async def index(request: Request):
 </div>
 <script>
 const p=document.getElementById('particles');
-for(let i=0;i<25;i++){
+for(let i=0;i<25;i++){{
   const d=document.createElement('div');d.className='particle';
   const s=Math.random()*8+2;
-  d.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;bottom:-10px;background:rgba(${Math.random()>.5?'220,38,38':'248,113,113'},${Math.random()*.3+.05});animation-duration:${Math.random()*20+10}s;animation-delay:${Math.random()*15}s;`;
+  d.style.cssText=`width:${{s}}px;height:${{s}}px;left:${{Math.random()*100}}%;bottom:-10px;background:rgba(${{Math.random()>.5?'220,38,38':'248,113,113'}},${{Math.random()*.3+.05}});animation-duration:${{Math.random()*20+10}}s;animation-delay:${{Math.random()*15}}s;`;
   p.appendChild(d);
-}
+}}
 </script>
-</body></html>""")
+</body></html>""".format(css=CSS, client_id=DISCORD_CLIENT_ID, redirect_uri=DISCORD_REDIRECT_URI)
+    return HTMLResponse(login_html)
 
 @app.get("/callback")
 async def callback(code: str):
@@ -835,7 +837,7 @@ async def api_overview(request: Request):
     }
 
 @app.get("/api/moderation/warns")
-async def api_warns(request: Request, user_id: str = None):
+async def api_warns(request: Request, user_id: Optional[str] = None):
     auth_check(request)
     query = {"guild_id": GUILD_ID}
     if user_id: query["user_id"] = int(user_id)

@@ -4,6 +4,7 @@ from discord import app_commands
 import os, asyncio, threading, time, random, re
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 import uvicorn
 from fastapi import FastAPI
@@ -151,7 +152,7 @@ async def on_ready():
         if cfg.get("custom_bot_status"):
             await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=cfg["custom_bot_status"]))
             return
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{sum(g.member_count for g in bot.guilds)} Member | /help"))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{sum((g.member_count or 0) for g in bot.guilds)} Member | /help"))
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -160,9 +161,9 @@ async def on_member_join(member: discord.Member):
     slow_min = cfg.get("slow_joiner_minutes", 0)
     if slow_min > 0:
         age = (datetime.utcnow() - member.created_at.replace(tzinfo=None)).total_seconds() / 60
-        if age < slow_joiner_minutes:
+        if age < slow_min:
             try:
-                await member.send(f"Dein Account ist zu neu. Komm in {slow_joiner_minutes} Minuten wieder.")
+                await member.send(f"Dein Account ist zu neu. Komm in {slow_min} Minuten wieder.")
                 await member.kick(reason="Account zu neu (Slow Joiner Protection)")
             except: pass
             return
@@ -239,7 +240,7 @@ async def on_message(msg: discord.Message):
 
     # AutoMod
     automod = cfg.get("automod", {})
-    if automod.get("enabled") and not msg.author.guild_permissions.manage_messages:
+    if automod.get("enabled") and msg.guild and not msg.author.guild_permissions.manage_messages:
         # Bad Words
         if automod.get("bad_words"):
             for word in automod["bad_words"]:
@@ -265,7 +266,7 @@ async def on_message(msg: discord.Message):
             try:
                 await msg.delete()
                 until = discord.utils.utcnow() + timedelta(minutes=5)
-                await msg.author.timeout(until, reason="Mention Spam")
+                await msg.author.timeout(until, reason="Mention Spam") if hasattr(msg.author, 'timeout') else None
                 await msg.channel.send(f"{msg.author.mention} Mention Spam! 5 Minuten Timeout.", delete_after=5)
             except: pass
             return
@@ -278,7 +279,7 @@ async def on_message(msg: discord.Message):
         if len(spam_tracker[key]) >= 5:
             try:
                 until = discord.utils.utcnow() + timedelta(minutes=2)
-                await msg.author.timeout(until, reason="Spam")
+                await msg.author.timeout(until, reason="Spam") if hasattr(msg.author, 'timeout') else None
                 await msg.channel.send(f"{msg.author.mention} Spam erkannt! 2 Minuten Timeout.", delete_after=5)
             except: pass
 
@@ -287,12 +288,13 @@ async def on_message(msg: discord.Message):
 @bot.event
 async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
     if user.bot: return
+    if not reaction.message.guild: return
     cfg = await hole_config(reaction.message.guild.id)
     # Starboard
     sb_channel_id = cfg.get("starboard_channel")
     sb_min = cfg.get("starboard_min", 3)
     if sb_channel_id and str(reaction.emoji) == "⭐" and reaction.count >= sb_min:
-        sb_ch = reaction.message.guild.get_channel(int(sb_channel_id))
+        sb_ch = reaction.message.guild.get_channel(int(sb_channel_id)) if reaction.message.guild else None
         if sb_ch:
             existing = await starboard_col.find_one({"message_id": reaction.message.id})
             if not existing:
@@ -370,7 +372,8 @@ async def ban_cmd(interaction: discord.Interaction, user: discord.Member, grund:
         await interaction.followup.send("❌ Du kannst diesen User nicht bannen!"); return
     try: await user.send(f"Du wurdest von **{interaction.guild.name}** gebannt.\nGrund: {grund}")
     except: pass
-    await interaction.guild.ban(user, reason=grund, delete_message_days=delete_days)
+    if interaction.guild:
+        await interaction.guild.ban(user, reason=grund, delete_message_days=delete_days)
     case = await log_aktion(interaction.guild_id, interaction.user.id, user.id, "ban", grund)
     e = discord.Embed(title=f"🔨 Ban | Case #{case}", color=discord.Color.red())
     e.add_field(name="User", value=f"{user} ({user.id})", inline=True)
@@ -385,7 +388,8 @@ async def unban_cmd(interaction: discord.Interaction, user_id: str, grund: str =
     await interaction.response.defer()
     try:
         user = await bot.fetch_user(int(user_id))
-        await interaction.guild.unban(user, reason=grund)
+        if interaction.guild:
+            await interaction.guild.unban(user, reason=grund)
         await interaction.followup.send(f"✅ **{user}** entbannt.")
     except: await interaction.followup.send("❌ User nicht gefunden.")
 
@@ -411,7 +415,8 @@ async def kick_cmd(interaction: discord.Interaction, user: discord.Member, grund
 async def timeout_cmd(interaction: discord.Interaction, user: discord.Member, minuten: int, grund: str = "Kein Grund"):
     await interaction.response.defer()
     until = discord.utils.utcnow() + timedelta(minutes=minuten)
-    await user.timeout(until, reason=grund)
+    if hasattr(user, 'timeout'):
+        await user.timeout(until, reason=grund)
     case = await log_aktion(interaction.guild_id, interaction.user.id, user.id, "timeout", grund)
     e = discord.Embed(title=f"⏰ Timeout | Case #{case}", color=discord.Color.yellow())
     e.add_field(name="User", value=user.mention, inline=True)
@@ -433,7 +438,7 @@ async def warn_cmd(interaction: discord.Interaction, user: discord.Member, grund
     await warns_col.insert_one({"guild_id": interaction.guild_id, "user_id": user.id, "mod_id": interaction.user.id, "grund": grund, "ts": datetime.utcnow()})
     count = await warns_col.count_documents({"guild_id": interaction.guild_id, "user_id": user.id})
     case = await log_aktion(interaction.guild_id, interaction.user.id, user.id, "warn", grund)
-    try: await user.send(f"Verwarnung auf **{interaction.guild.name}**\nGrund: {grund}\nVerwarnungen: {count}")
+    try: await user.send(f"Verwarnung auf **{interaction.guild.name if interaction.guild else 'this server'}**\nGrund: {grund}\nVerwarnungen: {count}")
     except: pass
     e = discord.Embed(title=f"⚠️ Warn | Case #{case}", color=discord.Color.yellow())
     e.add_field(name="User", value=user.mention, inline=True)
@@ -451,7 +456,7 @@ async def warns_cmd(interaction: discord.Interaction, user: discord.Member):
     if not warns: e.description = "Keine Verwarnungen."
     else:
         for i, w in enumerate(warns, 1):
-            mod = interaction.guild.get_member(w["mod_id"])
+            mod = interaction.guild.get_member(w["mod_id"]) if interaction.guild else None
             e.add_field(name=f"#{i} – {w['ts'].strftime('%d.%m.%Y')}", value=f"{w['grund']}\nMod: {mod.mention if mod else '?'}", inline=False)
     await interaction.followup.send(embed=e)
 
@@ -477,8 +482,8 @@ async def case_cmd(interaction: discord.Interaction, nummer: int):
     await interaction.response.defer()
     case = await cases_col.find_one({"guild_id": interaction.guild_id, "case": nummer})
     if not case: await interaction.followup.send("❌ Case nicht gefunden."); return
-    mod = interaction.guild.get_member(case["mod_id"])
-    target = interaction.guild.get_member(case["target_id"])
+    mod = interaction.guild.get_member(case["mod_id"]) if interaction.guild else None
+    target = interaction.guild.get_member(case["target_id"]) if interaction.guild else None
     e = discord.Embed(title=f"📋 Case #{nummer}", color=discord.Color.blurple())
     e.add_field(name="Aktion", value=case["aktion"], inline=True)
     e.add_field(name="User", value=str(target) if target else str(case["target_id"]), inline=True)
@@ -492,25 +497,28 @@ async def case_cmd(interaction: discord.Interaction, nummer: int):
 async def clear_cmd(interaction: discord.Interaction, anzahl: int, user: discord.Member = None):
     await interaction.response.defer(ephemeral=True)
     def check(m): return user is None or m.author == user
-    deleted = await interaction.channel.purge(limit=min(anzahl, 100), check=check)
+    deleted = await interaction.channel.purge(limit=min(anzahl, 100), check=check) if interaction.channel else None
     await interaction.followup.send(f"✅ {len(deleted)} Nachrichten gelöscht.", ephemeral=True)
 
 @bot.tree.command(name="slowmode", description="Slowmode setzen.")
 @is_mod()
 async def slowmode_cmd(interaction: discord.Interaction, sekunden: int):
-    await interaction.channel.edit(slowmode_delay=sekunden)
+    if interaction.channel and hasattr(interaction.channel, 'edit'):
+        await interaction.channel.edit(slowmode_delay=sekunden)
     await interaction.response.send_message(f"✅ Slowmode: **{sekunden}s**")
 
 @bot.tree.command(name="lock", description="Kanal sperren.")
 @is_mod()
 async def lock_cmd(interaction: discord.Interaction):
-    await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
+    if interaction.channel and interaction.guild and hasattr(interaction.channel, 'set_permissions'):
+        await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
     await interaction.response.send_message("🔒 Kanal gesperrt.")
 
 @bot.tree.command(name="unlock", description="Kanal entsperren.")
 @is_mod()
 async def unlock_cmd(interaction: discord.Interaction):
-    await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
+    if interaction.channel and interaction.guild and hasattr(interaction.channel, 'set_permissions'):
+        await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
     await interaction.response.send_message("🔓 Kanal entsperrt.")
 
 @bot.tree.command(name="raid-mode", description="[Admin] Raid Mode aktivieren/deaktivieren.")
@@ -1497,7 +1505,8 @@ async def shop_add_cmd(interaction: discord.Interaction, name: str, preis: int, 
 @commands.has_permissions(kick_members=True)
 async def mute_prefix(ctx, user: discord.Member, minuten: int = 10, *, grund: str = "Kein Grund"):
     until = discord.utils.utcnow() + timedelta(minutes=minuten)
-    await user.timeout(until, reason=grund)
+    if hasattr(user, 'timeout'):
+        await user.timeout(until, reason=grund)
     await ctx.send(f"⏰ {user.mention} für **{minuten} Min** gemutet. Grund: {grund}")
 
 @bot.command(name="unmute")
