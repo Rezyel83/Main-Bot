@@ -147,7 +147,7 @@ async def on_ready():
         if cfg.get("custom_bot_status"):
             await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=cfg["custom_bot_status"]))
             return
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{sum(g.member_count for g in bot.guilds)} Member | /main-help"))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{sum(g.member_count for g in bot.guilds)} Member | /help"))
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -358,7 +358,7 @@ async def _mod_log(guild, embed):
             try: await ch.send(embed=embed)
             except: pass
 
-@bot.tree.command(name="main-ban", description="Bannt einen User.")
+@bot.tree.command(name="ban", description="Bannt einen User.")
 @is_mod()
 async def ban_cmd(interaction: discord.Interaction, user: discord.Member, grund: str = "Kein Grund", delete_days: int = 0):
     await interaction.response.defer()
@@ -375,7 +375,7 @@ async def ban_cmd(interaction: discord.Interaction, user: discord.Member, grund:
     await interaction.followup.send(embed=e)
     await _mod_log(interaction.guild, e)
 
-@bot.tree.command(name="main-unban", description="Entbannt einen User.")
+@bot.tree.command(name="unban", description="Entbannt einen User.")
 @is_mod()
 async def unban_cmd(interaction: discord.Interaction, user_id: str, grund: str = "Kein Grund"):
     await interaction.response.defer()
@@ -385,7 +385,7 @@ async def unban_cmd(interaction: discord.Interaction, user_id: str, grund: str =
         await interaction.followup.send(f"✅ **{user}** entbannt.")
     except: await interaction.followup.send("❌ User nicht gefunden.")
 
-@bot.tree.command(name="main-kick", description="Kickt einen User.")
+@bot.tree.command(name="kick", description="Kickt einen User.")
 @is_mod()
 async def kick_cmd(interaction: discord.Interaction, user: discord.Member, grund: str = "Kein Grund"):
     await interaction.response.defer()
@@ -402,7 +402,7 @@ async def kick_cmd(interaction: discord.Interaction, user: discord.Member, grund
     await interaction.followup.send(embed=e)
     await _mod_log(interaction.guild, e)
 
-@bot.tree.command(name="main-timeout", description="Timeout für einen User.")
+@bot.tree.command(name="timeout", description="Timeout für einen User.")
 @is_mod()
 async def timeout_cmd(interaction: discord.Interaction, user: discord.Member, minuten: int, grund: str = "Kein Grund"):
     await interaction.response.defer()
@@ -416,13 +416,13 @@ async def timeout_cmd(interaction: discord.Interaction, user: discord.Member, mi
     await interaction.followup.send(embed=e)
     await _mod_log(interaction.guild, e)
 
-@bot.tree.command(name="main-untimeout", description="Timeout aufheben.")
+@bot.tree.command(name="untimeout", description="Timeout aufheben.")
 @is_mod()
 async def untimeout_cmd(interaction: discord.Interaction, user: discord.Member):
     await user.timeout(None)
     await interaction.response.send_message(f"✅ Timeout von {user.mention} aufgehoben.")
 
-@bot.tree.command(name="main-warn", description="Verwarnt einen User.")
+@bot.tree.command(name="warn", description="Verwarnt einen User.")
 @is_mod()
 async def warn_cmd(interaction: discord.Interaction, user: discord.Member, grund: str):
     await interaction.response.defer()
@@ -438,7 +438,7 @@ async def warn_cmd(interaction: discord.Interaction, user: discord.Member, grund
     await interaction.followup.send(embed=e)
     await _mod_log(interaction.guild, e)
 
-@bot.tree.command(name="main-warns", description="Verwarnungen anzeigen.")
+@bot.tree.command(name="warns", description="Verwarnungen anzeigen.")
 @is_mod()
 async def warns_cmd(interaction: discord.Interaction, user: discord.Member):
     await interaction.response.defer()
@@ -451,7 +451,7 @@ async def warns_cmd(interaction: discord.Interaction, user: discord.Member):
             e.add_field(name=f"#{i} – {w['ts'].strftime('%d.%m.%Y')}", value=f"{w['grund']}\nMod: {mod.mention if mod else '?'}", inline=False)
     await interaction.followup.send(embed=e)
 
-@bot.tree.command(name="main-unwarn", description="Letzte Verwarnung entfernen.")
+@bot.tree.command(name="unwarn", description="Letzte Verwarnung entfernen.")
 @is_mod()
 async def unwarn_cmd(interaction: discord.Interaction, user: discord.Member):
     await interaction.response.defer()
@@ -460,14 +460,14 @@ async def unwarn_cmd(interaction: discord.Interaction, user: discord.Member):
     await warns_col.delete_one({"_id": last["_id"]})
     await interaction.followup.send(f"✅ Letzte Verwarnung von {user.mention} entfernt.")
 
-@bot.tree.command(name="main-clearwarns", description="[Admin] Alle Verwarnungen löschen.")
+@bot.tree.command(name="clearwarns", description="[Admin] Alle Verwarnungen löschen.")
 @is_admin()
 async def clearwarns_cmd(interaction: discord.Interaction, user: discord.Member):
     await interaction.response.defer()
     r = await warns_col.delete_many({"guild_id": interaction.guild_id, "user_id": user.id})
     await interaction.followup.send(f"✅ {r.deleted_count} Verwarnungen gelöscht.")
 
-@bot.tree.command(name="main-case", description="Case Details anzeigen.")
+@bot.tree.command(name="case", description="Case Details anzeigen.")
 @is_mod()
 async def case_cmd(interaction: discord.Interaction, nummer: int):
     await interaction.response.defer()
@@ -483,7 +483,7 @@ async def case_cmd(interaction: discord.Interaction, nummer: int):
     e.add_field(name="Datum", value=case["ts"].strftime("%d.%m.%Y %H:%M"), inline=True)
     await interaction.followup.send(embed=e)
 
-@bot.tree.command(name="main-clear", description="Nachrichten löschen.")
+@bot.tree.command(name="clear", description="Nachrichten löschen.")
 @is_mod()
 async def clear_cmd(interaction: discord.Interaction, anzahl: int, user: discord.Member = None):
     await interaction.response.defer(ephemeral=True)
@@ -491,25 +491,25 @@ async def clear_cmd(interaction: discord.Interaction, anzahl: int, user: discord
     deleted = await interaction.channel.purge(limit=min(anzahl, 100), check=check)
     await interaction.followup.send(f"✅ {len(deleted)} Nachrichten gelöscht.", ephemeral=True)
 
-@bot.tree.command(name="main-slowmode", description="Slowmode setzen.")
+@bot.tree.command(name="slowmode", description="Slowmode setzen.")
 @is_mod()
 async def slowmode_cmd(interaction: discord.Interaction, sekunden: int):
     await interaction.channel.edit(slowmode_delay=sekunden)
     await interaction.response.send_message(f"✅ Slowmode: **{sekunden}s**")
 
-@bot.tree.command(name="main-lock", description="Kanal sperren.")
+@bot.tree.command(name="lock", description="Kanal sperren.")
 @is_mod()
 async def lock_cmd(interaction: discord.Interaction):
     await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
     await interaction.response.send_message("🔒 Kanal gesperrt.")
 
-@bot.tree.command(name="main-unlock", description="Kanal entsperren.")
+@bot.tree.command(name="unlock", description="Kanal entsperren.")
 @is_mod()
 async def unlock_cmd(interaction: discord.Interaction):
     await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
     await interaction.response.send_message("🔓 Kanal entsperrt.")
 
-@bot.tree.command(name="main-raid-mode", description="[Admin] Raid Mode aktivieren/deaktivieren.")
+@bot.tree.command(name="raid-mode", description="[Admin] Raid Mode aktivieren/deaktivieren.")
 @is_admin()
 async def raid_mode_cmd(interaction: discord.Interaction, aktiv: bool):
     await config_col.update_one({"guild_id": interaction.guild_id}, {"$set": {"anti_raid": aktiv}}, upsert=True)
@@ -518,7 +518,7 @@ async def raid_mode_cmd(interaction: discord.Interaction, aktiv: bool):
 # ══════════════════════════════════════════════════════════════
 # INFO COMMANDS
 # ══════════════════════════════════════════════════════════════
-@bot.tree.command(name="main-userinfo", description="User Informationen.")
+@bot.tree.command(name="userinfo", description="User Informationen.")
 async def userinfo_cmd(interaction: discord.Interaction, user: discord.Member = None):
     await interaction.response.defer()
     u = user or interaction.user
@@ -534,7 +534,7 @@ async def userinfo_cmd(interaction: discord.Interaction, user: discord.Member = 
     e.add_field(name="💰 Coins", value=str(eco.get("coins", 0)), inline=True)
     await interaction.followup.send(embed=e)
 
-@bot.tree.command(name="main-serverinfo", description="Server Informationen.")
+@bot.tree.command(name="serverinfo", description="Server Informationen.")
 async def serverinfo_cmd(interaction: discord.Interaction):
     await interaction.response.defer()
     g = interaction.guild
@@ -550,21 +550,21 @@ async def serverinfo_cmd(interaction: discord.Interaction):
     e.add_field(name="Boosts", value=str(g.premium_subscription_count), inline=True)
     await interaction.followup.send(embed=e)
 
-@bot.tree.command(name="main-avatar", description="Avatar anzeigen.")
+@bot.tree.command(name="avatar", description="Avatar anzeigen.")
 async def avatar_cmd(interaction: discord.Interaction, user: discord.Member = None):
     u = user or interaction.user
     e = discord.Embed(title=f"🖼️ {u.display_name}", color=discord.Color.blurple())
     e.set_image(url=u.display_avatar.url)
     await interaction.response.send_message(embed=e)
 
-@bot.tree.command(name="main-ping", description="Bot Latenz.")
+@bot.tree.command(name="ping", description="Bot Latenz.")
 async def ping_cmd(interaction: discord.Interaction):
     uptime = datetime.utcnow() - start_time
     hours, rem = divmod(int(uptime.total_seconds()), 3600)
     minutes, seconds = divmod(rem, 60)
     await interaction.response.send_message(f"🏓 Pong! **{round(bot.latency * 1000)}ms** | Uptime: {hours}h {minutes}m {seconds}s")
 
-@bot.tree.command(name="main-timestamp", description="Discord Timestamp erstellen.")
+@bot.tree.command(name="timestamp", description="Discord Timestamp erstellen.")
 async def timestamp_cmd(interaction: discord.Interaction, datum: str, uhrzeit: str = "00:00", posten: bool = False):
     try:
         dt = datetime.strptime(f"{datum} {uhrzeit}", "%d.%m.%Y %H:%M")
@@ -590,7 +590,7 @@ async def timestamp_cmd(interaction: discord.Interaction, datum: str, uhrzeit: s
 # ══════════════════════════════════════════════════════════════
 # FUN COMMANDS
 # ══════════════════════════════════════════════════════════════
-@bot.tree.command(name="main-8ball", description="Stelle eine Frage!")
+@bot.tree.command(name="8ball", description="Stelle eine Frage!")
 async def ball_cmd(interaction: discord.Interaction, frage: str):
     antworten = ["Ja!", "Definitiv ja!", "Sehr wahrscheinlich.", "Vielleicht.", "Eher nicht.", "Definitiv nein!", "Frag später nochmal.", "Die Zeichen sagen ja.", "Unmöglich.", "Ohne Zweifel!"]
     e = discord.Embed(title="🎱 8Ball", color=discord.Color.purple())
@@ -598,11 +598,11 @@ async def ball_cmd(interaction: discord.Interaction, frage: str):
     e.add_field(name="🎱 Antwort", value=random.choice(antworten), inline=False)
     await interaction.response.send_message(embed=e)
 
-@bot.tree.command(name="main-coinflip", description="Münze werfen.")
+@bot.tree.command(name="coinflip", description="Münze werfen.")
 async def coinflip_cmd(interaction: discord.Interaction):
     await interaction.response.send_message(f"🪙 **{random.choice(['Kopf 👑', 'Zahl 🔢'])}**")
 
-@bot.tree.command(name="main-würfel", description="Würfel werfen.")
+@bot.tree.command(name="würfel", description="Würfel werfen.")
 async def wuerfel_cmd(interaction: discord.Interaction, anzahl: int = 1, seiten: int = 6):
     anzahl = min(anzahl, 10)
     ergebnisse = [random.randint(1, seiten) for _ in range(anzahl)]
@@ -611,7 +611,7 @@ async def wuerfel_cmd(interaction: discord.Interaction, anzahl: int = 1, seiten:
     e.add_field(name="Summe", value=str(sum(ergebnisse)))
     await interaction.response.send_message(embed=e)
 
-@bot.tree.command(name="main-rps", description="Schere Stein Papier.")
+@bot.tree.command(name="rps", description="Schere Stein Papier.")
 async def rps_cmd(interaction: discord.Interaction, wahl: str):
     optionen = ["schere", "stein", "papier"]
     wahl = wahl.lower()
@@ -627,7 +627,7 @@ async def rps_cmd(interaction: discord.Interaction, wahl: str):
     e.add_field(name="Ergebnis", value=result, inline=False)
     await interaction.response.send_message(embed=e)
 
-@bot.tree.command(name="main-quote", description="Inspirierendes Zitat.")
+@bot.tree.command(name="quote", description="Inspirierendes Zitat.")
 async def quote_cmd(interaction: discord.Interaction):
     await interaction.response.defer()
     import aiohttp
@@ -639,7 +639,7 @@ async def quote_cmd(interaction: discord.Interaction):
         await interaction.followup.send(embed=e)
     except: await interaction.followup.send("❌ Fehler beim Laden.")
 
-@bot.tree.command(name="main-fact", description="Zufälliger Fakt.")
+@bot.tree.command(name="fact", description="Zufälliger Fakt.")
 async def fact_cmd(interaction: discord.Interaction):
     await interaction.response.defer()
     import aiohttp
@@ -651,7 +651,7 @@ async def fact_cmd(interaction: discord.Interaction):
         await interaction.followup.send(embed=e)
     except: await interaction.followup.send("❌ Fehler beim Laden.")
 
-@bot.tree.command(name="main-gif", description="GIF suchen.")
+@bot.tree.command(name="gif", description="GIF suchen.")
 async def gif_cmd(interaction: discord.Interaction, suche: str):
     await interaction.response.defer()
     import aiohttp
@@ -665,7 +665,7 @@ async def gif_cmd(interaction: discord.Interaction, suche: str):
         await interaction.followup.send(gif["media"][0]["gif"]["url"])
     except: await interaction.followup.send("❌ Fehler.")
 
-@bot.tree.command(name="main-poll", description="Abstimmung erstellen.")
+@bot.tree.command(name="poll", description="Abstimmung erstellen.")
 async def poll_cmd(interaction: discord.Interaction, frage: str, option1: str, option2: str, option3: str = None, option4: str = None):
     optionen = [o for o in [option1, option2, option3, option4] if o]
     emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
@@ -675,7 +675,7 @@ async def poll_cmd(interaction: discord.Interaction, frage: str, option1: str, o
     msg = await interaction.original_response()
     for i in range(len(optionen)): await msg.add_reaction(emojis[i])
 
-@bot.tree.command(name="main-calc", description="Rechnung ausführen.")
+@bot.tree.command(name="calc", description="Rechnung ausführen.")
 async def calc_cmd(interaction: discord.Interaction, rechnung: str):
     if re.search(r'[a-zA-Z_]', rechnung.replace('e', '').replace('pi', '')):
         await interaction.response.send_message("❌ Ungültig!"); return
@@ -684,7 +684,7 @@ async def calc_cmd(interaction: discord.Interaction, rechnung: str):
         await interaction.response.send_message(f"🧮 `{rechnung}` = **{result}**")
     except: await interaction.response.send_message("❌ Ungültige Rechnung!")
 
-@bot.tree.command(name="main-meme", description="Zufälliges Meme.")
+@bot.tree.command(name="meme", description="Zufälliges Meme.")
 async def meme_cmd(interaction: discord.Interaction):
     await interaction.response.defer()
     import aiohttp
@@ -698,7 +698,7 @@ async def meme_cmd(interaction: discord.Interaction):
         await interaction.followup.send(embed=e)
     except: await interaction.followup.send("❌ Kein Meme geladen.")
 
-@bot.tree.command(name="main-status-setzen", description="Persönlichen Status setzen.")
+@bot.tree.command(name="status-setzen", description="Persönlichen Status setzen.")
 async def status_setzen_cmd(interaction: discord.Interaction, status: str):
     await profiles_col.update_one({"guild_id": interaction.guild_id, "user_id": interaction.user.id}, {"$set": {"status": status}}, upsert=True)
     await interaction.response.send_message(f"✅ Status gesetzt: *{status}*", ephemeral=True)
@@ -706,7 +706,7 @@ async def status_setzen_cmd(interaction: discord.Interaction, status: str):
 # ══════════════════════════════════════════════════════════════
 # AFK SYSTEM
 # ══════════════════════════════════════════════════════════════
-@bot.tree.command(name="main-afk", description="AFK setzen.")
+@bot.tree.command(name="afk", description="AFK setzen.")
 async def afk_cmd(interaction: discord.Interaction, grund: str = "AFK"):
     await afk_col.update_one({"guild_id": interaction.guild_id, "user_id": interaction.user.id}, {"$set": {"grund": grund, "ts": datetime.utcnow()}}, upsert=True)
     await interaction.response.send_message(f"💤 AFK gesetzt: *{grund}*")
@@ -714,7 +714,7 @@ async def afk_cmd(interaction: discord.Interaction, grund: str = "AFK"):
 # ══════════════════════════════════════════════════════════════
 # REMINDERS
 # ══════════════════════════════════════════════════════════════
-@bot.tree.command(name="main-remindme", description="Erinnerung setzen.")
+@bot.tree.command(name="remindme", description="Erinnerung setzen.")
 async def remindme_cmd(interaction: discord.Interaction, zeit: str, nachricht: str):
     match = re.match(r'(\d+)(m|h|d)', zeit.lower())
     if not match: await interaction.response.send_message("❌ Format: 10m, 2h, 1d"); return
@@ -1003,7 +1003,7 @@ async def giveaway_loop():
 # ══════════════════════════════════════════════════════════════
 # SUGGESTIONS
 # ══════════════════════════════════════════════════════════════
-@bot.tree.command(name="main-suggest", description="Vorschlag einreichen.")
+@bot.tree.command(name="suggest", description="Vorschlag einreichen.")
 async def suggest_cmd(interaction: discord.Interaction, vorschlag: str):
     await interaction.response.defer(ephemeral=True)
     cfg = await hole_config(interaction.guild_id)
@@ -1018,7 +1018,7 @@ async def suggest_cmd(interaction: discord.Interaction, vorschlag: str):
     await suggest_col.insert_one({"guild_id": interaction.guild_id, "user_id": interaction.user.id, "vorschlag": vorschlag, "message_id": msg.id, "status": "offen", "ts": datetime.utcnow()})
     await interaction.followup.send("✅ Vorschlag eingereicht!")
 
-@bot.tree.command(name="main-suggest-accept", description="[Admin] Vorschlag annehmen.")
+@bot.tree.command(name="suggest-accept", description="[Admin] Vorschlag annehmen.")
 @is_admin()
 async def suggest_accept_cmd(interaction: discord.Interaction, message_id: str, grund: str = ""):
     await interaction.response.defer()
@@ -1036,7 +1036,7 @@ async def suggest_accept_cmd(interaction: discord.Interaction, message_id: str, 
     await suggest_col.update_one({"_id": sug["_id"]}, {"$set": {"status": "angenommen"}})
     await interaction.followup.send("✅ Vorschlag angenommen!")
 
-@bot.tree.command(name="main-suggest-deny", description="[Admin] Vorschlag ablehnen.")
+@bot.tree.command(name="suggest-deny", description="[Admin] Vorschlag ablehnen.")
 @is_admin()
 async def suggest_deny_cmd(interaction: discord.Interaction, message_id: str, grund: str = ""):
     await interaction.response.defer()
@@ -1057,7 +1057,7 @@ async def suggest_deny_cmd(interaction: discord.Interaction, message_id: str, gr
 # ══════════════════════════════════════════════════════════════
 # BIRTHDAY SYSTEM
 # ══════════════════════════════════════════════════════════════
-@bot.tree.command(name="main-geburtstag", description="Geburtstag eintragen.")
+@bot.tree.command(name="geburtstag", description="Geburtstag eintragen.")
 async def birthday_cmd(interaction: discord.Interaction, datum: str):
     try:
         datetime.strptime(datum, "%d.%m")
@@ -1161,7 +1161,7 @@ async def team_remove_cmd(interaction: discord.Interaction, user: discord.Member
     await team_col.delete_one({"guild_id": interaction.guild_id, "user_id": user.id})
     await interaction.response.send_message(f"✅ {user.mention} entfernt.")
 
-@bot.tree.command(name="main-team", description="Team anzeigen.")
+@bot.tree.command(name="team", description="Team anzeigen.")
 async def team_cmd(interaction: discord.Interaction):
     await interaction.response.defer()
     members = await team_col.find({"guild_id": interaction.guild_id, "aktiv": True}).to_list(50)
@@ -1173,14 +1173,14 @@ async def team_cmd(interaction: discord.Interaction):
             e.add_field(name=m.get("rolle", "Mitglied"), value=user.mention if user else str(m["user_id"]), inline=True)
     await interaction.followup.send(embed=e)
 
-@bot.tree.command(name="main-abmelden", description="Abwesenheit eintragen.")
+@bot.tree.command(name="abmelden", description="Abwesenheit eintragen.")
 async def abmelden_cmd(interaction: discord.Interaction, von: str, bis: str, grund: str = "Kein Grund"):
     m = await team_col.find_one({"guild_id": interaction.guild_id, "user_id": interaction.user.id})
     if not m: await interaction.response.send_message("❌ Du bist kein Team-Mitglied!", ephemeral=True); return
     await team_col.update_one({"guild_id": interaction.guild_id, "user_id": interaction.user.id}, {"$push": {"abmeldungen": {"von": von, "bis": bis, "grund": grund, "ts": datetime.utcnow()}}})
     await interaction.response.send_message(f"✅ Abmeldung: **{von}** bis **{bis}** – {grund}", ephemeral=True)
 
-@bot.tree.command(name="main-bewerben", description="Fürs Team bewerben.")
+@bot.tree.command(name="bewerben", description="Fürs Team bewerben.")
 async def bewerben_cmd(interaction: discord.Interaction, alter: str, erfahrung: str, warum: str, verfuegbarkeit: str):
     await interaction.response.defer(ephemeral=True)
     existing = await apps_col.find_one({"guild_id": interaction.guild_id, "user_id": interaction.user.id, "status": "offen"})
@@ -1199,7 +1199,7 @@ async def bewerben_cmd(interaction: discord.Interaction, alter: str, erfahrung: 
             await ch.send(embed=e)
     await interaction.followup.send("✅ Bewerbung eingereicht!")
 
-@bot.tree.command(name="main-bewerbungen", description="[Admin] Bewerbungen anzeigen.")
+@bot.tree.command(name="bewerbungen", description="[Admin] Bewerbungen anzeigen.")
 @is_admin()
 async def bewerbungen_cmd(interaction: discord.Interaction):
     await interaction.response.defer()
@@ -1211,7 +1211,7 @@ async def bewerbungen_cmd(interaction: discord.Interaction):
         e.add_field(name=str(user) if user else str(a["user_id"]), value=f"Alter: {a['alter']}\nVerfügbar: {a['verfuegbarkeit']}", inline=True)
     await interaction.followup.send(embed=e)
 
-@bot.tree.command(name="main-bewerbung-accept", description="[Admin] Bewerbung annehmen.")
+@bot.tree.command(name="bewerbung-accept", description="[Admin] Bewerbung annehmen.")
 @is_admin()
 async def bewerbung_accept_cmd(interaction: discord.Interaction, user: discord.Member):
     await interaction.response.defer()
@@ -1222,7 +1222,7 @@ async def bewerbung_accept_cmd(interaction: discord.Interaction, user: discord.M
     except: pass
     await interaction.followup.send(f"✅ Bewerbung von {user.mention} angenommen!")
 
-@bot.tree.command(name="main-bewerbung-deny", description="[Admin] Bewerbung ablehnen.")
+@bot.tree.command(name="bewerbung-deny", description="[Admin] Bewerbung ablehnen.")
 @is_admin()
 async def bewerbung_deny_cmd(interaction: discord.Interaction, user: discord.Member, grund: str = "Kein Grund"):
     await interaction.response.defer()
@@ -1511,20 +1511,20 @@ async def clear_prefix(ctx, anzahl: int = 10):
 # ══════════════════════════════════════════════════════════════
 # HELP
 # ══════════════════════════════════════════════════════════════
-@bot.tree.command(name="main-help", description="Alle Commands.")
+@bot.tree.command(name="help", description="Alle Commands.")
 async def help_cmd(interaction: discord.Interaction):
     e = discord.Embed(title="📖 RLD Main Bot", color=discord.Color.blurple())
-    e.add_field(name="🛡️ Mod", value="`/main-ban` `/main-kick` `/main-timeout` `/main-warn` `/main-warns` `/main-clear` `/main-slowmode` `/main-lock` `/main-case` `/main-raid-mode`", inline=False)
-    e.add_field(name="ℹ️ Info", value="`/main-userinfo` `/main-serverinfo` `/main-avatar` `/main-ping` `/main-timestamp`", inline=False)
-    e.add_field(name="🎮 Fun", value="`/main-8ball` `/main-coinflip` `/main-würfel` `/main-rps` `/main-quote` `/main-fact` `/main-gif` `/main-poll` `/main-calc` `/main-meme`", inline=False)
+    e.add_field(name="🛡️ Mod", value="`/ban` `/main-kick` `/main-timeout` `/main-warn` `/main-warns` `/main-clear` `/main-slowmode` `/main-lock` `/main-case` `/main-raid-mode`", inline=False)
+    e.add_field(name="ℹ️ Info", value="`/userinfo` `/main-serverinfo` `/main-avatar` `/main-ping` `/main-timestamp`", inline=False)
+    e.add_field(name="🎮 Fun", value="`/8ball` `/main-coinflip` `/main-würfel` `/main-rps` `/main-quote` `/main-fact` `/main-gif` `/main-poll` `/main-calc` `/main-meme`", inline=False)
     e.add_field(name="💰 Economy", value="`/eco-balance` `/eco-daily` `/eco-work` `/eco-fish` `/eco-mine` `/eco-gamble` `/eco-rob` `/eco-pay` `/eco-slots` `/eco-shop` `/eco-buy` `/eco-rep` `/eco-leaderboard`", inline=False)
     e.add_field(name="🎉 Giveaway", value="`/giveaway-start` `/giveaway-reroll`", inline=False)
-    e.add_field(name="💡 Suggestions", value="`/main-suggest` `/main-suggest-accept` `/main-suggest-deny`", inline=False)
+    e.add_field(name="💡 Suggestions", value="`/suggest` `/main-suggest-accept` `/main-suggest-deny`", inline=False)
     e.add_field(name="🎂 Geburtstag", value="`/main-geburtstag`", inline=False)
-    e.add_field(name="💤 AFK", value="`/main-afk` `/main-remindme`", inline=False)
+    e.add_field(name="💤 AFK", value="`/afk` `/main-remindme`", inline=False)
     e.add_field(name="🎫 Ticket", value="`/ticket-setup`", inline=False)
     e.add_field(name="✅ Verify", value="`/verify-setup`", inline=False)
-    e.add_field(name="👥 Team", value="`/main-team` `/team-add` `/team-remove` `/main-abmelden` `/main-bewerben` `/main-bewerbungen` `/main-bewerbung-accept` `/main-bewerbung-deny`", inline=False)
+    e.add_field(name="👥 Team", value="`/team` `/team-add` `/team-remove` `/main-abmelden` `/main-bewerben` `/main-bewerbungen` `/main-bewerbung-accept` `/main-bewerbung-deny`", inline=False)
     e.add_field(name="🚗 RL Teams", value="`/rl-team-erstellen` `/rl-team-join` `/rl-teams`", inline=False)
     e.add_field(name="📰 RSS", value="`/rss-add` `/rss-remove` `/rss-list`", inline=False)
     e.add_field(name="📣 Notifications", value="`/notif-twitch` `/notif-youtube`", inline=False)
