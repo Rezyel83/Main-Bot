@@ -10,8 +10,8 @@ from functools import wraps
 from urllib.parse import quote
 
 from flask import Flask, render_template_string, request, redirect, session, url_for, flash, jsonify, make_response
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+# from flask_limiter import Limiter  # Not used in FastAPI version
+# from flask_limiter.util import get_remote_address
 
 # ============ CONFIGURATION ============
 

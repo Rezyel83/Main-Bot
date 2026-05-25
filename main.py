@@ -74,7 +74,8 @@ notif_col     = db["notifications"]
 dashboard_log_col = db["dashboard_logs"]
 
 # ── Config Helfer ──────────────────────────────────────────────
-async def hole_config(gid: int) -> dict:
+async def hole_config(gid: Optional[int]) -> dict:
+    if not gid: return {}
     doc = await config_col.find_one({"guild_id": gid})
     if not doc:
         doc = {
