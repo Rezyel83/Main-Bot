@@ -35,11 +35,26 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok", "ping": round(bot.latency * 1000) if bot.is_ready() else -1}
+# ✅ NEU (Flask - WSGI kompatibel)
+from flask import Flask
+
+flask_app = Flask(__name__)
+
+@flask_app.route("/")
+def root():
+    return {"status": "ok", "bot": "RLD Main Bot", "uptime": str(datetime.utcnow())}
+
+@flask_app.route("/ping")
+def ping():
+    return {"status": "alive"}
+
+@flask_app.route("/health")
+def health():
+    return {"status": "ok", "ping": round(bot.latency * 1000) if bot.is_ready() else -1}
 
 def starte_webserver():
-    from dashboard import app as dashboard_app
     port = int(os.getenv("PORT", "8000"))
-    uvicorn.run(dashboard_app, host="0.0.0.0", port=port, log_level="warning")
+    flask_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
 
 
 async def keep_alive():
