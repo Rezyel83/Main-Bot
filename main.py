@@ -368,9 +368,9 @@ async def _mod_log(guild, embed):
 @is_mod()
 async def ban_cmd(interaction: discord.Interaction, user: discord.Member, grund: str = "Kein Grund", delete_days: int = 0):
     await interaction.response.defer()
-    if user.top_role >= interaction.user.top_role:
+    if hasattr(user, 'top_role') and hasattr(interaction.user, 'top_role') and user.top_role >= interaction.user.top_role:
         await interaction.followup.send("❌ Du kannst diesen User nicht bannen!"); return
-    try: await user.send(f"Du wurdest von **{interaction.guild.name}** gebannt.\nGrund: {grund}")
+    try: await user.send(f"Du wurdest von **{interaction.guild.name if interaction.guild else 'this server'}** gebannt.\nGrund: {grund}")
     except: pass
     if interaction.guild:
         await interaction.guild.ban(user, reason=grund, delete_message_days=delete_days)
@@ -397,9 +397,9 @@ async def unban_cmd(interaction: discord.Interaction, user_id: str, grund: str =
 @is_mod()
 async def kick_cmd(interaction: discord.Interaction, user: discord.Member, grund: str = "Kein Grund"):
     await interaction.response.defer()
-    if user.top_role >= interaction.user.top_role:
+    if hasattr(user, 'top_role') and hasattr(interaction.user, 'top_role') and user.top_role >= interaction.user.top_role:
         await interaction.followup.send("❌ Du kannst diesen User nicht kicken!"); return
-    try: await user.send(f"Du wurdest von **{interaction.guild.name}** gekickt.\nGrund: {grund}")
+    try: await user.send(f"Du wurdest von **{interaction.guild.name if interaction.guild else 'this server'}** gekickt.\nGrund: {grund}")
     except: pass
     await user.kick(reason=grund)
     case = await log_aktion(interaction.guild_id, interaction.user.id, user.id, "kick", grund)
@@ -494,30 +494,30 @@ async def case_cmd(interaction: discord.Interaction, nummer: int):
 
 @bot.tree.command(name="clear", description="Nachrichten löschen.")
 @is_mod()
-async def clear_cmd(interaction: discord.Interaction, anzahl: int, user: discord.Member = None):
+async def clear_cmd(interaction: discord.Interaction, anzahl: int, user: Optional[discord.Member] = None):
     await interaction.response.defer(ephemeral=True)
     def check(m): return user is None or m.author == user
-    deleted = await interaction.channel.purge(limit=min(anzahl, 100), check=check) if interaction.channel else None
+    deleted = await interaction.channel.purge(limit=min(anzahl, 100), check=check) if interaction.channel and hasattr(interaction.channel, 'purge') else []
     await interaction.followup.send(f"✅ {len(deleted)} Nachrichten gelöscht.", ephemeral=True)
 
 @bot.tree.command(name="slowmode", description="Slowmode setzen.")
 @is_mod()
 async def slowmode_cmd(interaction: discord.Interaction, sekunden: int):
     if interaction.channel and hasattr(interaction.channel, 'edit'):
-        await interaction.channel.edit(slowmode_delay=sekunden)
+        await interaction.channel.edit(slowmode_delay=sekunden) if hasattr(interaction.channel, 'edit') else None
     await interaction.response.send_message(f"✅ Slowmode: **{sekunden}s**")
 
 @bot.tree.command(name="lock", description="Kanal sperren.")
 @is_mod()
 async def lock_cmd(interaction: discord.Interaction):
-    if interaction.channel and interaction.guild and hasattr(interaction.channel, 'set_permissions'):
+    if interaction.channel and interaction.guild and hasattr(interaction.channel, 'set_permissions') and hasattr(interaction.guild, 'default_role'):
         await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
     await interaction.response.send_message("🔒 Kanal gesperrt.")
 
 @bot.tree.command(name="unlock", description="Kanal entsperren.")
 @is_mod()
 async def unlock_cmd(interaction: discord.Interaction):
-    if interaction.channel and interaction.guild and hasattr(interaction.channel, 'set_permissions'):
+    if interaction.channel and interaction.guild and hasattr(interaction.channel, 'set_permissions') and hasattr(interaction.guild, 'default_role'):
         await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
     await interaction.response.send_message("🔓 Kanal entsperrt.")
 
@@ -563,7 +563,7 @@ async def serverinfo_cmd(interaction: discord.Interaction):
     await interaction.followup.send(embed=e)
 
 @bot.tree.command(name="avatar", description="Avatar anzeigen.")
-async def avatar_cmd(interaction: discord.Interaction, user: discord.Member = None):
+async def avatar_cmd(interaction: discord.Interaction, user: Optional[discord.Member] = None):
     u = user or interaction.user
     e = discord.Embed(title=f"🖼️ {u.display_name}", color=discord.Color.blurple())
     e.set_image(url=u.display_avatar.url)
