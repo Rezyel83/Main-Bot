@@ -1,14 +1,4 @@
- Here's the complete **all-in-one dashboard** in a single Python file with embedded HTML templates:
-
-```python
-#!/usr/bin/env python3
-"""
-Discord Bot Dashboard - All-in-One
-Features: Discord OAuth2, Channel Permissions with Role Presets, All Bot Features
-Optimized for Render Free Tier with Keep-Alive
-"""
-
-import os
+mport os
 import json
 import base64
 import sqlite3
