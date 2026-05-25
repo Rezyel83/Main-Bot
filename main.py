@@ -22,10 +22,25 @@ async def root():
 async def health():
     return {"status": "ok", "ping": round(bot.latency * 1000) if bot.is_ready() else -1}
 
+# ❌ ALT (FastAPI/UVICORN - funktioniert nicht mit Flask)
+from fastapi import FastAPI
+import uvicorn
+
+app = FastAPI()
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "bot": "RLD Main Bot", "uptime": str(datetime.utcnow())}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "ping": round(bot.latency * 1000) if bot.is_ready() else -1}
+
 def starte_webserver():
     from dashboard import app as dashboard_app
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(dashboard_app, host="0.0.0.0", port=port, log_level="warning")
+
 
 async def keep_alive():
     url = os.getenv("RENDER_EXTERNAL_URL", "")
