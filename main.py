@@ -1681,7 +1681,7 @@ def gsett(gid):
 <div class="fg"><label class="lbl">Starboard Min. Sterne</label><input name="starboard_min" type="number" class="inp" value="{cfg.get("starboard_min",3)}" style="max-width:100px"></div>
 </div>
 <div class="card"><div class="ct">🎫 Ticket</div>
-<div class="fg"><label class="lbl">Ticket Kategorie</label><select name="ticket_category" class="sel"><option value="">-- Keine --</option>{"".join(f\'<option value="{c["id"]}"{"selected" if str(cfg.get("ticket_category",""))==c["id"] else ""}>{c["name"]}</option>\' for c in chs if c.get("type")==4)}</select></div>
+<div class="fg"><label class="lbl">Ticket Kategorie</label><select name="ticket_category" class="sel"><option value="">-- Keine --</option>{"".join((f'<option value="{c["id"]}" ' + ('selected' if str(cfg.get("ticket_category",""))==c["id"] else '') + f'>{c["name"]}</option>') for c in chs if c.get("type")==4)}</select></div>
 <div class="fg"><label class="lbl">Ticket Team-Rolle</label><select name="ticket_team_role" class="sel">{ro(cfg.get("ticket_team_role",""))}</select></div>
 </div>
 <button type="submit" class="btn bp">💾 Speichern</button>
