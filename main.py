@@ -521,7 +521,7 @@ async def rps_cmd(i:discord.Interaction,wahl:str):
     await i.response.send_message(embed=e)
 
 @bot.tree.command(name="poll",description="Abstimmung erstellen.")
-async def poll_cmd(i:discord.Interaction,frage:str,option1:str,option2:str,option3:str=None,option4:str=None):
+async def poll_cmd(i:discord.Interaction,frage:str,option1:str,option2:str,option3:Optional[str]=None,option4:Optional[str]=None):
     opts=[o for o in[option1,option2,option3,option4] if o]; ems=["1️⃣","2️⃣","3️⃣","4️⃣"]
     e=discord.Embed(title=f"📊 {frage}",description="\n".join(f"{ems[n]} {o}" for n,o in enumerate(opts)),color=discord.Color.blurple())
     e.set_footer(text=f"von {i.user.display_name}")
@@ -564,6 +564,7 @@ async def afk_cmd(i:discord.Interaction,grund:str="AFK"):
 @bot.tree.command(name="afk-list",description="Alle AFK User anzeigen.")
 async def afk_list_cmd(i:discord.Interaction):
     await i.response.defer()
+    if not i.guild: await i.followup.send("❌ Guild nicht gefunden"); return
     al=await col("afk").find({"guild_id":i.guild_id}).to_list(30)
     e=discord.Embed(title="💤 AFK User",color=discord.Color.blurple())
     if not al: e.description="Niemand ist AFK."
@@ -594,7 +595,7 @@ async def reminder_loop():
 
 # ── ECONOMY ───────────────────────────────────────────────────
 @bot.tree.command(name="eco-balance",description="Kontostand anzeigen.")
-async def bal_cmd(i:discord.Interaction,user:discord.Member=None):
+async def bal_cmd(i:discord.Interaction,user:Optional[discord.Member]=None):
     await i.response.defer(); z=user or i.user; eco=await heco(i.guild_id,z.id)
     e=discord.Embed(title=f"💰 {z.display_name}",color=discord.Color.gold())
     e.add_field(name="👛 Wallet",value=f"{eco.get('coins',0)} Coins"); e.add_field(name="🏦 Bank",value=f"{eco.get('bank',0)} Coins")
@@ -691,7 +692,9 @@ async def pay_cmd(i:discord.Interaction,user:discord.Member,menge:int):
 
 @bot.tree.command(name="eco-leaderboard",description="Reichste User.")
 async def lb_cmd(i:discord.Interaction):
-    await i.response.defer(); top=await col("economy").find({"guild_id":i.guild_id}).sort("coins",-1).limit(10).to_list(10)
+    await i.response.defer()
+    if not i.guild: await i.followup.send("❌ Guild nicht gefunden"); return
+    top=await col("economy").find({"guild_id":i.guild_id}).sort("coins",-1).limit(10).to_list(10)
     e=discord.Embed(title="💰 Reichste User",color=discord.Color.gold()); md=["🥇","🥈","🥉"]
     lines=[]
     for idx,u in enumerate(top):
