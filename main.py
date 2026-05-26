@@ -279,6 +279,7 @@ async def on_app_err(i:discord.Interaction,err:app_commands.AppCommandError):
 @is_mod()
 async def ban_cmd(i:discord.Interaction,user:discord.Member,grund:str="Kein Grund",del_days:int=0):
     await i.response.defer()
+    if not i.guild: await i.followup.send("❌ Guild nicht gefunden"); return
     if user.top_role>=i.user.top_role: await i.followup.send("❌ Höhere Rolle!"); return
     try: await user.send(f"Du wurdest von **{i.guild.name}** gebannt. Grund: {grund}")
     except: pass
@@ -292,6 +293,7 @@ async def ban_cmd(i:discord.Interaction,user:discord.Member,grund:str="Kein Grun
 @is_mod()
 async def unban_cmd(i:discord.Interaction,user_id:str,grund:str="Kein Grund"):
     await i.response.defer()
+    if not i.guild: await i.followup.send("❌ Guild nicht gefunden"); return
     try: u=await bot.fetch_user(int(user_id)); await i.guild.unban(u,reason=grund); await i.followup.send(f"✅ **{u}** entbannt.")
     except: await i.followup.send("❌ User nicht gefunden.")
 
@@ -299,6 +301,7 @@ async def unban_cmd(i:discord.Interaction,user_id:str,grund:str="Kein Grund"):
 @is_mod()
 async def kick_cmd(i:discord.Interaction,user:discord.Member,grund:str="Kein Grund"):
     await i.response.defer()
+    if not i.guild: await i.followup.send("❌ Guild nicht gefunden"); return
     if user.top_role>=i.user.top_role: await i.followup.send("❌ Höhere Rolle!"); return
     try: await user.send(f"Du wurdest von **{i.guild.name}** gekickt. Grund: {grund}")
     except: pass
@@ -328,6 +331,7 @@ async def untimeout_cmd(i:discord.Interaction,user:discord.Member):
 @is_mod()
 async def warn_cmd(i:discord.Interaction,user:discord.Member,grund:str):
     await i.response.defer()
+    if not i.guild: await i.followup.send("❌ Guild nicht gefunden"); return
     await col("warns").insert_one({"guild_id":i.guild_id,"user_id":user.id,"mod_id":i.user.id,"grund":grund,"ts":datetime.utcnow()})
     cnt=await col("warns").count_documents({"guild_id":i.guild_id,"user_id":user.id})
     n=await logcase(i.guild_id,i.user.id,user.id,"warn",grund)
@@ -412,8 +416,9 @@ async def nick_cmd(i:discord.Interaction,user:discord.Member,name:str=""):
 @is_admin()
 async def raidmode_cmd(i:discord.Interaction,aktiv:bool):
     await i.response.defer()
+    if not i.guild_id: await i.followup.send("❌ Guild ID nicht gefunden"); return
     await col("config").update_one({"guild_id":i.guild_id},{"$set":{"anti_raid":aktiv}},upsert=True)
-    ivcfg(i.guild_id); await i.followup.send(f"{'🚨 Raid Mode AKTIV' if aktiv else '✅ Raid Mode aus'}")
+    await i.followup.send(f"{'🚨 Raid Mode AKTIV' if aktiv else '✅ Raid Mode aus'}")
 
 @bot.tree.command(name="purge-user",description="Alle Nachrichten eines Users löschen.")
 @is_mod()
