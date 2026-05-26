@@ -345,6 +345,7 @@ async def warn_cmd(i:discord.Interaction,user:discord.Member,grund:str):
 @is_mod()
 async def warns_cmd(i:discord.Interaction,user:discord.Member):
     await i.response.defer()
+    if not i.guild: await i.followup.send("❌ Guild nicht gefunden"); return
     ws=await col("warns").find({"guild_id":i.guild_id,"user_id":user.id}).sort("ts",-1).to_list(20)
     e=discord.Embed(title=f"⚠️ Warns: {user.display_name}",color=discord.Color.yellow())
     if not ws: e.description="Keine Verwarnungen."
@@ -372,6 +373,7 @@ async def clearwarns_cmd(i:discord.Interaction,user:discord.Member):
 @is_mod()
 async def case_cmd(i:discord.Interaction,nummer:int):
     await i.response.defer()
+    if not i.guild: await i.followup.send("❌ Guild nicht gefunden"); return
     c=await col("cases").find_one({"guild_id":i.guild_id,"case":nummer})
     if not c: await i.followup.send("❌ Case nicht gefunden."); return
     md=i.guild.get_member(c["mod_id"]); tg=i.guild.get_member(c["target_id"])
@@ -384,26 +386,30 @@ async def case_cmd(i:discord.Interaction,nummer:int):
 @is_mod()
 async def clear_cmd(i:discord.Interaction,anzahl:int,user:Optional[discord.Member]=None):
     await i.response.defer(ephemeral=True)
+    if not i.channel or not hasattr(i.channel, 'purge'): await i.followup.send("❌ Kanal nicht verfügbar", ephemeral=True); return
     chk=(lambda m:m.author==user) if user else None
-    d=await i.channel.purge(limit=min(anzahl,100),check=chk)
+    d=await i.channel.purge(limit=min(anzahl,100),check=chk) if chk else await i.channel.purge(limit=min(anzahl,100))
     await i.followup.send(f"✅ {len(d)} Nachrichten gelöscht.",ephemeral=True)
 
 @bot.tree.command(name="slowmode",description="Slowmode setzen.")
 @is_mod()
 async def slowmode_cmd(i:discord.Interaction,sekunden:int):
     await i.response.defer()
+    if not i.channel or not hasattr(i.channel, 'edit'): await i.followup.send("❌ Kanal nicht verfügbar"); return
     await i.channel.edit(slowmode_delay=sekunden); await i.followup.send(f"✅ Slowmode: **{sekunden}s**")
 
 @bot.tree.command(name="lock",description="Kanal sperren.")
 @is_mod()
 async def lock_cmd(i:discord.Interaction):
     await i.response.defer()
+    if not i.guild or not i.channel or not hasattr(i.channel, 'set_permissions'): await i.followup.send("❌ Guild/Kanal nicht verfügbar"); return
     await i.channel.set_permissions(i.guild.default_role,send_messages=False); await i.followup.send("🔒 Gesperrt.")
 
 @bot.tree.command(name="unlock",description="Kanal entsperren.")
 @is_mod()
 async def unlock_cmd(i:discord.Interaction):
     await i.response.defer()
+    if not i.guild or not i.channel or not hasattr(i.channel, 'set_permissions'): await i.followup.send("❌ Guild/Kanal nicht verfügbar"); return
     await i.channel.set_permissions(i.guild.default_role,send_messages=True); await i.followup.send("🔓 Entsperrt.")
 
 @bot.tree.command(name="nick",description="Nickname ändern.")
@@ -424,12 +430,13 @@ async def raidmode_cmd(i:discord.Interaction,aktiv:bool):
 @is_mod()
 async def purge_cmd(i:discord.Interaction,user:discord.Member,limit:int=100):
     await i.response.defer(ephemeral=True)
+    if not i.channel or not hasattr(i.channel, 'purge'): await i.followup.send("❌ Kanal nicht verfügbar", ephemeral=True); return
     d=await i.channel.purge(limit=min(limit,500),check=lambda m:m.author==user)
     await i.followup.send(f"✅ {len(d)} Nachrichten von {user.display_name} gelöscht.",ephemeral=True)
 
 # ── INFO ──────────────────────────────────────────────────────
 @bot.tree.command(name="userinfo",description="User Informationen.")
-async def userinfo_cmd(i:discord.Interaction,user:discord.Member=None):
+async def userinfo_cmd(i:discord.Interaction,user:Optional[discord.Member]=None):
     await i.response.defer()
     u=user or i.user
     wc=await col("warns").count_documents({"guild_id":i.guild_id,"user_id":u.id})
@@ -446,7 +453,9 @@ async def userinfo_cmd(i:discord.Interaction,user:discord.Member=None):
 @bot.tree.command(name="serverinfo",description="Server Informationen.")
 async def serverinfo_cmd(i:discord.Interaction):
     await i.response.defer()
-    g=i.guild; e=discord.Embed(title=f"🏠 {g.name}",color=discord.Color.blurple())
+    g=i.guild
+    if not g: await i.followup.send("❌ Guild nicht gefunden"); return
+    e=discord.Embed(title=f"🏠 {g.name}",color=discord.Color.blurple())
     if g.icon: e.set_thumbnail(url=g.icon.url)
     e.add_field(name="ID",value=str(g.id)); e.add_field(name="Owner",value=str(g.owner)); e.add_field(name="Erstellt",value=g.created_at.strftime("%d.%m.%Y"))
     e.add_field(name="👥 Member",value=str(g.member_count)); e.add_field(name="💬 Kanäle",value=str(len(g.channels))); e.add_field(name="🎭 Rollen",value=str(len(g.roles)))
