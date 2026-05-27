@@ -76,6 +76,16 @@ async def logcase(gid,mid,tid,act,grund)->int:
     e={"guild_id":gid,"case":n,"mod_id":mid,"target_id":tid,"aktion":act,"grund":grund,"ts":now}
     await col("cases").insert_one(e); await col("logs").insert_one(e.copy()); return n
 
+# ── Motor async helpers (FIX: prevents Motor lazy-eval bug) ──
+async def _count(c,q): return await c.count_documents(q)
+async def _find(c,q,sort=None,limit=50):
+    cur=c.find(q)
+    if sort: cur=cur.sort(*sort)
+    return await cur.to_list(limit)
+async def _findone(c,q): return await c.find_one(q)
+async def _update(c,q,u,upsert=False): return await c.update_one(q,u,upsert=upsert)
+async def _delete(c,q): return await c.delete_one(q)
+
 _OPS={ast.Add:operator.add,ast.Sub:operator.sub,ast.Mult:operator.mul,ast.Div:operator.truediv,
       ast.Pow:operator.pow,ast.Mod:operator.mod,ast.FloorDiv:operator.floordiv,
       ast.UAdd:operator.pos,ast.USub:operator.neg}
@@ -386,7 +396,7 @@ async def case_cmd(i:discord.Interaction,nummer:int):
 @is_mod()
 async def clear_cmd(i:discord.Interaction,anzahl:int,user:Optional[discord.Member]=None):
     await i.response.defer(ephemeral=True)
-    if not i.channel or not hasattr(i.channel, 'purge'): await i.followup.send("❌ Kanal nicht verfügbar", ephemeral=True); return
+    if not i.channel or not hasattr(i.channel,'purge'): await i.followup.send("❌ Kanal nicht verfügbar",ephemeral=True); return
     chk=(lambda m:m.author==user) if user else None
     d=await i.channel.purge(limit=min(anzahl,100),check=chk) if chk else await i.channel.purge(limit=min(anzahl,100))
     await i.followup.send(f"✅ {len(d)} Nachrichten gelöscht.",ephemeral=True)
@@ -395,21 +405,21 @@ async def clear_cmd(i:discord.Interaction,anzahl:int,user:Optional[discord.Membe
 @is_mod()
 async def slowmode_cmd(i:discord.Interaction,sekunden:int):
     await i.response.defer()
-    if not i.channel or not hasattr(i.channel, 'edit'): await i.followup.send("❌ Kanal nicht verfügbar"); return
+    if not i.channel or not hasattr(i.channel,'edit'): await i.followup.send("❌ Kanal nicht verfügbar"); return
     await i.channel.edit(slowmode_delay=sekunden); await i.followup.send(f"✅ Slowmode: **{sekunden}s**")
 
 @bot.tree.command(name="lock",description="Kanal sperren.")
 @is_mod()
 async def lock_cmd(i:discord.Interaction):
     await i.response.defer()
-    if not i.guild or not i.channel or not hasattr(i.channel, 'set_permissions'): await i.followup.send("❌ Guild/Kanal nicht verfügbar"); return
+    if not i.guild or not i.channel or not hasattr(i.channel,'set_permissions'): await i.followup.send("❌ Guild/Kanal nicht verfügbar"); return
     await i.channel.set_permissions(i.guild.default_role,send_messages=False); await i.followup.send("🔒 Gesperrt.")
 
 @bot.tree.command(name="unlock",description="Kanal entsperren.")
 @is_mod()
 async def unlock_cmd(i:discord.Interaction):
     await i.response.defer()
-    if not i.guild or not i.channel or not hasattr(i.channel, 'set_permissions'): await i.followup.send("❌ Guild/Kanal nicht verfügbar"); return
+    if not i.guild or not i.channel or not hasattr(i.channel,'set_permissions'): await i.followup.send("❌ Guild/Kanal nicht verfügbar"); return
     await i.channel.set_permissions(i.guild.default_role,send_messages=True); await i.followup.send("🔓 Entsperrt.")
 
 @bot.tree.command(name="nick",description="Nickname ändern.")
@@ -430,7 +440,7 @@ async def raidmode_cmd(i:discord.Interaction,aktiv:bool):
 @is_mod()
 async def purge_cmd(i:discord.Interaction,user:discord.Member,limit:int=100):
     await i.response.defer(ephemeral=True)
-    if not i.channel or not hasattr(i.channel, 'purge'): await i.followup.send("❌ Kanal nicht verfügbar", ephemeral=True); return
+    if not i.channel or not hasattr(i.channel,'purge'): await i.followup.send("❌ Kanal nicht verfügbar",ephemeral=True); return
     d=await i.channel.purge(limit=min(limit,500),check=lambda m:m.author==user)
     await i.followup.send(f"✅ {len(d)} Nachrichten von {user.display_name} gelöscht.",ephemeral=True)
 
@@ -760,7 +770,7 @@ async def inv_cmd(i:discord.Interaction):
 # ── GIVEAWAY ──────────────────────────────────────────────────
 @bot.tree.command(name="giveaway-start",description="[Admin] Giveaway starten.")
 @is_admin()
-async def gw_cmd(i:discord.Interaction,preis:str,dauer:str,gewinner:int=1,rolle:discord.Role=None):
+async def gw_cmd(i:discord.Interaction,preis:str,dauer:str,gewinner:int=1,rolle:Optional[discord.Role]=None):
     await i.response.defer()
     mt=re.match(r"(\d+)(m|h|d)",dauer.lower())
     if not mt: await i.followup.send("❌ Format: 10m, 2h, 1d"); return
@@ -871,7 +881,7 @@ async def bday_loop():
         if not g: continue
         cfg=await gcfg(b["guild_id"]); cid=cfg.get("birthday_channel")
         if not cid: continue
-        ch=g.get_channel(int(cid));
+        ch=g.get_channel(int(cid))
         if not ch: continue
         m=g.get_member(b["user_id"])
         if not m: continue
@@ -1339,7 +1349,7 @@ def dget(ep,token=None,isbot=False):
     try: r=hr.get(f"{DAPI}{ep}",headers=hd,timeout=6); return r.json() if r.ok else None
     except: return None
 
-_ugc:dict={}; _bgc:tuple=([], 0.0); _GTTL=60
+_ugc:dict={}; _bgc:tuple=([],0.0); _GTTL=60
 
 def uguilds(tok)->list:
     now=time.monotonic()
@@ -1370,7 +1380,6 @@ def greq(f):
         if not gid: return redirect(url_for("dash"))
         ug=uguilds(session.get("access_token",""))
         bg={g["id"] for g in bguilds()}
-        # KEY FIX: check if bot is in guild using bot guild list
         ug2=next((g for g in ug if g["id"]==gid),None)
         if not ug2: flash("Kein Zugriff.","error"); return redirect(url_for("dash"))
         if gid not in bg: flash("Bot ist nicht auf diesem Server.","error"); return redirect(url_for("dash"))
@@ -1423,8 +1432,10 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);min-h
 .footer{text-align:center;padding:1rem;color:var(--tx2);font-size:.78rem;border-top:1px solid var(--bdr);margin-top:2rem}
 @media(max-width:700px){.side{display:none}.main{padding:1rem}}"""
 
+# FIX: _al() now uses Flask's get_flashed_messages properly
 def _al():
-    ms=session.get("_flashes",[])
+    from flask import get_flashed_messages
+    ms=get_flashed_messages(with_categories=True)
     return "".join(f'<div class="al {"aok" if c=="success" else "aer"}">{m}</div>' for c,m in ms)
 
 def _side(gid,active):
@@ -1435,7 +1446,7 @@ def _side(gid,active):
     items="".join(f'<a href="/g/{gid}/{ep}" class="sl{" on" if ep==active else ""}">{ic} {lb}</a>' for ic,lb,ep in ls)
     return f'<aside class="side">{items}</aside>'
 
-BH=f'<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RLD Dashboard</title><style>{_C}</style></head><body>{{body}}<div class="footer">RLD Dashboard &mdash; Made by Rezyel with AI &bull; &copy; 2025</div></body></html>'
+BH='<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RLD Dashboard</title><style>'+_C+'</style></head><body>{body}<div class="footer">RLD Dashboard &mdash; Made by Rezyel with AI &bull; &copy; 2025</div></body></html>'
 
 def pg(body): return BH.replace("{body}",body)
 
@@ -1443,11 +1454,16 @@ def gnav(gid):
     g=dget(f"/guilds/{gid}",isbot=True) or {"name":gid}
     return f'<nav class="nav"><div class="logo">🤖 {g.get("name",gid)}</div><div class="nav-r"><a href="/dash" class="btn bs bsm">← Zurück</a><span>{session.get("username","")}</span><a href="/logout" class="btn bs bsm">Abmelden</a></div></nav>',g
 
+# FIX: runasync with bot.loop guard
 def runasync(coro,timeout=4):
     import asyncio as _a
-    fut=_a.run_coroutine_threadsafe(coro,bot.loop)
-    try: return fut.result(timeout=timeout)
-    except: return None
+    try:
+        loop=bot.loop
+        if loop is None or not loop.is_running(): return None
+        fut=_a.run_coroutine_threadsafe(coro,loop)
+        return fut.result(timeout=timeout)
+    except Exception:
+        return None
 
 @fa.route("/")
 def idx(): return redirect(url_for("dash") if "user_id" in session else url_for("dlogin"))
@@ -1457,7 +1473,7 @@ def dlogin():
     if "user_id" in session: return redirect(url_for("dash"))
     sc="identify guilds"
     au=f"https://discord.com/api/oauth2/authorize?client_id={DISCORD_CLIENT_ID}&redirect_uri={quote(DISCORD_REDIRECT_URI)}&response_type=code&scope={quote(sc)}"
-    body=f'<div class="lw"><div class="lc"><div style="font-size:2.5rem;margin-bottom:.875rem">🤖</div><h1 class="lt">RLD Dashboard</h1><p class="ls">Mit Discord anmelden</p>{_al()}<a href="{au}" class="btn db">Mit Discord anmelden</a></div></div>'
+    body='<div class="lw"><div class="lc"><div style="font-size:2.5rem;margin-bottom:.875rem">🤖</div><h1 class="lt">RLD Dashboard</h1><p class="ls">Mit Discord anmelden</p>'+_al()+f'<a href="{au}" class="btn db">Mit Discord anmelden</a></div></div>'
     return pg(body)
 
 @fa.route("/callback")
@@ -1481,11 +1497,10 @@ def logout(): session.clear(); return redirect(url_for("dlogin"))
 @lreq
 def dash():
     ug=uguilds(session["access_token"]); bg={g["id"] for g in bguilds()}
-    # Only show guilds where bot IS present AND user has manage perms
     gs=[g for g in ug if g["id"] in bg and(int(g.get("permissions",0))&0x8 or int(g.get("permissions",0))&0x20)]
     cards="".join(f'<a href="/g/{g["id"]}/ov" class="sc"><div class="si">{g["name"][:2]}</div><div class="sn">{g["name"]}</div><div class="ss">Verwalten →</div></a>' for g in gs)
     cards+=f'<a href="https://discord.com/api/oauth2/authorize?client_id={DISCORD_CLIENT_ID}&permissions=8&scope=bot%20applications.commands" target="_blank" class="sc" style="opacity:.55;border-style:dashed"><div class="si" style="border-style:dashed">+</div><div class="sn">Bot hinzufügen</div><div class="ss">Server einladen</div></a>'
-    body=f'<nav class="nav"><div class="logo">🤖 RLD Dashboard</div><div class="nav-r"><span>{session.get("username","")}</span><a href="/logout" class="btn bs bsm">Abmelden</a></div></nav><div class="wrap"><aside class="side"><div style="color:var(--tx2);font-size:.82rem;padding:.5rem 0">Wähle einen Server</div></aside><main class="main">{_al()}<div class="pt">Deine Server</div><p class="ps">Wähle einen Server</p><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:1.25rem"><div class="stat"><div class="sv">{len(bguilds())}</div><div class="sl2">Server mit Bot</div></div><div class="stat"><div class="sv">{len(gs)}</div><div class="sl2">Verwaltbar</div></div></div><div class="sg">{cards}</div></main></div>'
+    body=f'<nav class="nav"><div class="logo">🤖 RLD Dashboard</div><div class="nav-r"><span>{session.get("username","")}</span><a href="/logout" class="btn bs bsm">Abmelden</a></div></nav><div class="wrap"><aside class="side"><div style="color:var(--tx2);font-size:.82rem;padding:.5rem 0">Wähle einen Server</div></aside><main class="main">'+_al()+f'<div class="pt">Deine Server</div><p class="ps">Wähle einen Server</p><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:1.25rem"><div class="stat"><div class="sv">{len(bguilds())}</div><div class="sl2">Server mit Bot</div></div><div class="stat"><div class="sv">{len(gs)}</div><div class="sl2">Verwaltbar</div></div></div><div class="sg">{cards}</div></main></div>'
     return pg(body)
 
 @fa.route("/g/<gid>/ov")
@@ -1493,8 +1508,9 @@ def dash():
 @greq
 def gov(gid):
     nav,g=gnav(gid); chs=dget(f"/guilds/{gid}/channels",isbot=True) or []; rls=dget(f"/guilds/{gid}/roles",isbot=True) or []
-    wc=runasync(col("warns").count_documents({"guild_id":int(gid)})) or "?"
-    body=f'{nav}<div class="wrap">{_side(gid,"ov")}<main class="main">{_al()}<div class="pt">Übersicht</div><p class="ps">{g.get("name","")}</p><div class="grid"><div class="stat"><div class="sv">{g.get("member_count","?")}</div><div class="sl2">Mitglieder</div></div><div class="stat"><div class="sv">{len(chs)}</div><div class="sl2">Channels</div></div><div class="stat"><div class="sv">{len(rls)}</div><div class="sl2">Rollen</div></div><div class="stat"><div class="sv">{wc}</div><div class="sl2">Verwarnungen</div></div></div><div class="card"><div class="ct">Schnellzugriff</div><div style="display:flex;gap:.75rem;flex-wrap:wrap"><a href="/g/{gid}/mod" class="btn bp">Verwarnungen</a><a href="/g/{gid}/eco" class="btn bp">Economy</a><a href="/g/{gid}/chperms" class="btn bp">Channel-Rechte</a><a href="/g/{gid}/sett" class="btn bs">Einstellungen</a></div></div></main></div>'
+    # FIX: use _count helper to avoid Motor lazy-eval bug
+    wc=runasync(_count(col("warns"),{"guild_id":int(gid)})) or "?"
+    body=nav+'<div class="wrap">'+_side(gid,"ov")+'<main class="main">'+_al()+f'<div class="pt">Übersicht</div><p class="ps">{g.get("name","")}</p><div class="grid"><div class="stat"><div class="sv">{g.get("member_count","?")}</div><div class="sl2">Mitglieder</div></div><div class="stat"><div class="sv">{len(chs)}</div><div class="sl2">Channels</div></div><div class="stat"><div class="sv">{len(rls)}</div><div class="sl2">Rollen</div></div><div class="stat"><div class="sv">{wc}</div><div class="sl2">Verwarnungen</div></div></div><div class="card"><div class="ct">Schnellzugriff</div><div style="display:flex;gap:.75rem;flex-wrap:wrap"><a href="/g/{gid}/mod" class="btn bp">Verwarnungen</a><a href="/g/{gid}/eco" class="btn bp">Economy</a><a href="/g/{gid}/chperms" class="btn bp">Channel-Rechte</a><a href="/g/{gid}/sett" class="btn bs">Einstellungen</a></div></div></main></div>'
     return pg(body)
 
 @fa.route("/g/<gid>/mod",methods=["GET"])
@@ -1504,9 +1520,10 @@ def gmod(gid):
     nav,g=gnav(gid); s=request.args.get("q","")
     q={"guild_id":int(gid)}
     if s: q["$or"]=[{"grund":{"$regex":s,"$options":"i"}}]
-    ws=runasync(col("warns").find(q).sort("ts",-1).to_list(50)) or []
-    rows="".join(f'<tr><td>{w.get("user_id","")}</td><td>{w.get("mod_id","")}</td><td>{str(w.get("grund",""))[:60]}</td><td>{w["ts"].strftime("%d.%m.%Y %H:%M") if isinstance(w.get("ts"),datetime) else ""}</td><td><form method="POST" action="/g/{gid}/mod/del/{w["_id"]}" style="display:inline"><button class="btn bd bsm" onclick="return confirm(\'Löschen?\')">🗑️</button></form></td></tr>' for w in ws)
-    body=f'{nav}<div class="wrap">{_side(gid,"mod")}<main class="main">{_al()}<div class="pt">Moderation</div><p class="ps">Verwarnungen</p><div class="card"><form method="GET" style="display:flex;gap:.75rem"><input name="q" class="inp" placeholder="Grund suchen..." value="{s}" style="max-width:300px"><button class="btn bp">Suchen</button></form></div><div class="card"><div class="ct">Verwarnungen</div><table class="tbl"><thead><tr><th>User</th><th>Mod</th><th>Grund</th><th>Datum</th><th></th></tr></thead><tbody>{rows or "<tr><td colspan=5 style=text-align:center;color:var(--tx2)>Keine Verwarnungen</td></tr>"}</tbody></table></div></main></div>'
+    # FIX: use _find helper
+    ws=runasync(_find(col("warns"),q,sort=("ts",-1),limit=50)) or []
+    rows="".join(f'<tr><td>{w.get("user_id","")}</td><td>{w.get("mod_id","")}</td><td>{str(w.get("grund",""))[:60]}</td><td>{w["ts"].strftime("%d.%m.%Y %H:%M") if isinstance(w.get("ts"),datetime) else ""}</td><td><form method="POST" action="/g/{gid}/mod/del/{w["_id"]}" style="display:inline"><button class="btn bd bsm" onclick="return confirm(\'Löschen?\')">&#128465;</button></form></td></tr>' for w in ws)
+    body=nav+'<div class="wrap">'+_side(gid,"mod")+'<main class="main">'+_al()+f'<div class="pt">Moderation</div><p class="ps">Verwarnungen</p><div class="card"><form method="GET" style="display:flex;gap:.75rem"><input name="q" class="inp" placeholder="Grund suchen..." value="{s}" style="max-width:300px"><button class="btn bp">Suchen</button></form></div><div class="card"><div class="ct">Verwarnungen</div><table class="tbl"><thead><tr><th>User</th><th>Mod</th><th>Grund</th><th>Datum</th><th></th></tr></thead><tbody>'+rows+'<tr style="display:none" id="empty"><td colspan="5" style="text-align:center;color:var(--tx2)">Keine Verwarnungen</td></tr></tbody></table></div></main></div>'
     return pg(body)
 
 @fa.route("/g/<gid>/mod/del/<wid>",methods=["POST"])
@@ -1514,7 +1531,8 @@ def gmod(gid):
 @greq
 def gdel(gid,wid):
     from bson import ObjectId
-    runasync(col("warns").delete_one({"_id":ObjectId(wid),"guild_id":int(gid)}))
+    # FIX: use _delete helper
+    runasync(_delete(col("warns"),{"_id":ObjectId(wid),"guild_id":int(gid)}))
     flash("Verwarnung gelöscht!","success"); return redirect(f"/g/{gid}/mod")
 
 @fa.route("/g/<gid>/eco",methods=["GET","POST"])
@@ -1525,16 +1543,18 @@ def geco(gid):
     if request.method=="POST":
         uid=request.form.get("uid","").strip(); amt=request.form.get("amt","0")
         if uid.isdigit() and amt.lstrip("-").isdigit():
-            runasync(col("economy").update_one({"guild_id":int(gid),"user_id":int(uid)},{"$set":{"coins":int(amt)}},upsert=True))
+            # FIX: use _update helper
+            runasync(_update(col("economy"),{"guild_id":int(gid),"user_id":int(uid)},{"$set":{"coins":int(amt)}},upsert=True))
             flash("Aktualisiert!","success")
-    lb=runasync(col("economy").find({"guild_id":int(gid)}).sort("coins",-1).limit(30).to_list(30)) or []
+    # FIX: use _find helper
+    lb=runasync(_find(col("economy"),{"guild_id":int(gid)},sort=("coins",-1),limit=30)) or []
     rows="".join(f'<tr><td>#{i+1}</td><td>{u.get("user_id","")}</td><td>{u.get("coins",0)} 💰</td><td>{u.get("bank",0)} 🏦</td><td>{u.get("rep",0)} ⭐</td></tr>' for i,u in enumerate(lb))
-    body=f'{nav}<div class="wrap">{_side(gid,"eco")}<main class="main">{_al()}<div class="pt">Economy</div><p class="ps">Leaderboard & Coins</p><div class="card"><div class="ct">Coins bearbeiten</div><form method="POST" style="display:grid;grid-template-columns:1fr 1fr auto;gap:.75rem;align-items:flex-end"><div class="fg" style="margin:0"><label class="lbl">User ID</label><input name="uid" class="inp" required></div><div class="fg" style="margin:0"><label class="lbl">Betrag</label><input name="amt" type="number" class="inp" required></div><button class="btn bp">Setzen</button></form></div><div class="card"><div class="ct">Leaderboard</div><table class="tbl"><thead><tr><th>#</th><th>User</th><th>Wallet</th><th>Bank</th><th>Rep</th></tr></thead><tbody>{rows or "<tr><td colspan=5 style=text-align:center;color:var(--tx2)>Keine Daten</td></tr>"}</tbody></table></div></main></div>'
+    body=nav+'<div class="wrap">'+_side(gid,"eco")+'<main class="main">'+_al()+'<div class="pt">Economy</div><p class="ps">Leaderboard &amp; Coins</p><div class="card"><div class="ct">Coins bearbeiten</div><form method="POST" style="display:grid;grid-template-columns:1fr 1fr auto;gap:.75rem;align-items:flex-end"><div class="fg" style="margin:0"><label class="lbl">User ID</label><input name="uid" class="inp" required></div><div class="fg" style="margin:0"><label class="lbl">Betrag</label><input name="amt" type="number" class="inp" required></div><button class="btn bp">Setzen</button></form></div><div class="card"><div class="ct">Leaderboard</div><table class="tbl"><thead><tr><th>#</th><th>User</th><th>Wallet</th><th>Bank</th><th>Rep</th></tr></thead><tbody>'+rows+'</tbody></table></div></main></div>'
     return pg(body)
 
 def _gpg(gid,ep,title,desc):
     nav,g=gnav(gid)
-    body=f'{nav}<div class="wrap">{_side(gid,ep)}<main class="main">{_al()}<div class="pt">{title}</div><p class="ps">{desc}</p><div class="card"><p style="color:var(--tx2)">Bald verfügbar.</p></div></main></div>'
+    body=nav+'<div class="wrap">'+_side(gid,ep)+'<main class="main">'+_al()+f'<div class="pt">{title}</div><p class="ps">{desc}</p><div class="card"><p style="color:var(--tx2)">Bald verfügbar.</p></div></main></div>'
     return pg(body)
 
 @fa.route("/g/<gid>/gws")
@@ -1577,9 +1597,10 @@ def gnotif(gid): return _gpg(gid,"notif","Notifications","Twitch & YouTube")
 @greq
 def gmlogs(gid):
     nav,g=gnav(gid)
-    ls=runasync(col("logs").find({"guild_id":int(gid)}).sort("ts",-1).limit(50).to_list(50)) or []
+    # FIX: use _find helper
+    ls=runasync(_find(col("logs"),{"guild_id":int(gid)},sort=("ts",-1),limit=50)) or []
     rows="".join(f'<tr><td>{l["ts"].strftime("%d.%m.%Y %H:%M") if isinstance(l.get("ts"),datetime) else ""}</td><td>{l.get("mod_id","")}</td><td><span class="bdg bb">{l.get("aktion","")}</span></td><td>{str(l.get("grund",""))[:60]}</td></tr>' for l in ls)
-    body=f'{nav}<div class="wrap">{_side(gid,"mlogs")}<main class="main">{_al()}<div class="pt">Mod Logs</div><p class="ps">Letzte Aktionen</p><div class="card"><table class="tbl"><thead><tr><th>Zeit</th><th>Mod</th><th>Aktion</th><th>Grund</th></tr></thead><tbody>{rows or "<tr><td colspan=4 style=text-align:center;color:var(--tx2)>Keine Logs</td></tr>"}</tbody></table></div></main></div>'
+    body=nav+'<div class="wrap">'+_side(gid,"mlogs")+'<main class="main">'+_al()+'<div class="pt">Mod Logs</div><p class="ps">Letzte Aktionen</p><div class="card"><table class="tbl"><thead><tr><th>Zeit</th><th>Mod</th><th>Aktion</th><th>Grund</th></tr></thead><tbody>'+rows+'</tbody></table></div></main></div>'
     return pg(body)
 
 # ── CHANNEL PERMISSIONS ───────────────────────────────────────
@@ -1603,7 +1624,6 @@ def gchperms(gid):
     tchs=[c for c in chs if c.get("type") in[0,5]]
     vchs=[c for c in chs if c.get("type") in[2,13]]
     all_chs=sorted(tchs+vchs,key=lambda c:c.get("position",0))
-    msg=""
     if request.method=="POST":
         cid2=request.form.get("channel_id"); rid=request.form.get("role_id"); pdata=request.form.get("perms","{}")
         if cid2 and rid:
@@ -1618,29 +1638,10 @@ def gchperms(gid):
                 else: flash(f"Discord Fehler: {r2.status_code}","error")
             except Exception as ex: flash(f"Fehler: {ex}","error")
     cat_opts="<option value=''>Alle</option>"+"".join(f'<option value="{c["id"]}">{c["name"]}</option>' for c in cats)
-    ch_opts="<option value=''>Channel wählen...</option>"+"".join(f'<option value="{c["id"]}" data-cat="{c.get("parent_id","")}">{("#" if c.get("type")==0 else "🔊 ")}{c["name"]}</option>' for c in all_chs)
+    ch_opts="<option value=''>Channel wählen...</option>"+"".join(f'<option value="{c["id"]}" data-cat="{c.get("parent_id","")}">{("#" if c.get("type")==0 else "&#128266; ")}{c["name"]}</option>' for c in all_chs)
     role_opts="<option value=''>Rolle wählen...</option>"+"".join(f'<option value="{r["id"]}">{r["name"]}</option>' for r in sorted(rls,key=lambda x:x.get("position",0),reverse=True))
-    perm_items="".join(f'<div class="perm-item"><span>{pn.replace("_"," ").title()}</span><div class="pbtns" data-p="{pn}"><button type="button" class="pb pa" onclick="sp(\'{pn}\',\'allow\')">✓</button><button type="button" class="pb pn on" onclick="sp(\'{pn}\',\'neutral\')">−</button><button type="button" class="pb pd" onclick="sp(\'{pn}\',\'deny\')">✕</button></div></div>' for pn in PBITS)
-    body=f'''{nav}<div class="wrap">{_side(gid,"chperms")}<main class="main">{_al()}<div class="pt">Channel-Rechte</div><p class="ps">Berechtigungen je Channel & Rolle bearbeiten</p>
-<div class="card"><div class="ct">Channel & Rolle wählen</div>
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:.875rem">
-<div class="fg" style="margin:0"><label class="lbl">Kategorie</label><select class="sel" onchange="fc(this.value)">{cat_opts}</select></div>
-<div class="fg" style="margin:0"><label class="lbl">Channel</label><select class="sel" id="chsel" onchange="lch(this.value)">{ch_opts}</select></div>
-<div class="fg" style="margin:0"><label class="lbl">Rolle</label><select class="sel" id="rlsel" onchange="document.getElementById('perm-role-id').value=this.value">{role_opts}</select></div>
-</div></div>
-<form method="POST" id="pf"><input type="hidden" name="channel_id" id="perm-channel-id"><input type="hidden" name="role_id" id="perm-role-id"><input type="hidden" name="perms" id="perm-data">
-<div class="card"><div class="ct">Berechtigungen</div><div class="perm-grid">{perm_items}</div>
-<div style="display:flex;gap:.75rem;margin-top:1rem"><button type="submit" class="btn bp">💾 Speichern</button><button type="button" class="btn bs" onclick="rp()">🔄 Reset</button></div></div></form>
-</main></div>
-<script>
-var ps={{}};
-function sp(n,s){{ps[n]=s;var g=document.querySelector('[data-p="'+n+'"]');g.querySelectorAll('.pb').forEach(function(b){{b.classList.remove('on')}});g.querySelector('.p'+s[0]).classList.add('on');upd()}}
-function upd(){{document.getElementById('perm-data').value=JSON.stringify(ps)}}
-function rp(){{ps={{}};document.querySelectorAll('.pb').forEach(function(b){{b.classList.remove('on')}});document.querySelectorAll('.pn').forEach(function(b){{b.classList.add('on')}});upd()}}
-function fc(cv){{var o=document.getElementById('chsel').querySelectorAll('option');o.forEach(function(op){{op.style.display=(!cv||op.dataset.cat==cv||!op.value)?'':'none'}})}}
-function lch(v){{document.getElementById('perm-channel-id').value=v}}
-rp();
-</script>'''
+    perm_items="".join(f'<div class="perm-item"><span>{pn.replace("_"," ").title()}</span><div class="pbtns" data-p="{pn}"><button type="button" class="pb pa" onclick="sp(\'{pn}\',\'allow\')">&#10003;</button><button type="button" class="pb pn on" onclick="sp(\'{pn}\',\'neutral\')">&#8722;</button><button type="button" class="pb pd" onclick="sp(\'{pn}\',\'deny\')">&#10005;</button></div></div>' for pn in PBITS)
+    body=nav+'<div class="wrap">'+_side(gid,"chperms")+'<main class="main">'+_al()+'<div class="pt">Channel-Rechte</div><p class="ps">Berechtigungen je Channel &amp; Rolle bearbeiten</p><div class="card"><div class="ct">Channel &amp; Rolle wählen</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:.875rem"><div class="fg" style="margin:0"><label class="lbl">Kategorie</label><select class="sel" onchange="fc(this.value)">'+cat_opts+'</select></div><div class="fg" style="margin:0"><label class="lbl">Channel</label><select class="sel" id="chsel" onchange="lch(this.value)">'+ch_opts+'</select></div><div class="fg" style="margin:0"><label class="lbl">Rolle</label><select class="sel" id="rlsel" onchange="document.getElementById(\'perm-role-id\').value=this.value">'+role_opts+'</select></div></div></div><form method="POST" id="pf"><input type="hidden" name="channel_id" id="perm-channel-id"><input type="hidden" name="role_id" id="perm-role-id"><input type="hidden" name="perms" id="perm-data"><div class="card"><div class="ct">Berechtigungen</div><div class="perm-grid">'+perm_items+'</div><div style="display:flex;gap:.75rem;margin-top:1rem"><button type="submit" class="btn bp">&#128190; Speichern</button><button type="button" class="btn bs" onclick="rp()">&#128260; Reset</button></div></div></form></main></div><script>var ps={};function sp(n,s){ps[n]=s;var g=document.querySelector(\'[data-p="\'+n+\'"]\');g.querySelectorAll(\'.pb\').forEach(function(b){b.classList.remove(\'on\')});g.querySelector(\'.p\'+s[0]).classList.add(\'on\');upd()}function upd(){document.getElementById(\'perm-data\').value=JSON.stringify(ps)}function rp(){ps={};document.querySelectorAll(\'.pb\').forEach(function(b){b.classList.remove(\'on\')});document.querySelectorAll(\'.pn\').forEach(function(b){b.classList.add(\'on\')});upd()}function fc(cv){var o=document.getElementById(\'chsel\').querySelectorAll(\'option\');o.forEach(function(op){op.style.display=(!cv||op.dataset.cat==cv||!op.value)?\'\':\' none\'})}function lch(v){document.getElementById(\'perm-channel-id\').value=v}rp();</script>'
     return pg(body)
 
 @fa.route("/g/<gid>/sett",methods=["GET","POST"])
@@ -1658,9 +1659,11 @@ def gsett(gid):
             f2[fi]=int(v) if v.isdigit() else 0
         f2["anti_raid"]=request.form.get("anti_raid")=="1"
         f2["welcome_dm"]=request.form.get("welcome_dm")=="1"
-        runasync(col("config").update_one({"guild_id":int(gid)},{"$set":f2},upsert=True)); ivcfg(int(gid))
+        # FIX: use _update helper
+        runasync(_update(col("config"),{"guild_id":int(gid)},{"$set":f2},upsert=True)); ivcfg(int(gid))
         flash("Gespeichert!","success")
-    cfg=runasync(col("config").find_one({"guild_id":int(gid)})) or {}
+    # FIX: use _findone helper
+    cfg=runasync(_findone(col("config"),{"guild_id":int(gid)})) or {}
     def co(sel,clist):
         o='<option value="">-- Deaktiviert --</option>'
         for c in clist:
@@ -1671,38 +1674,51 @@ def gsett(gid):
         for r in sorted(rls,key=lambda x:x.get("position",0),reverse=True):
             s=" selected" if str(sel)==r["id"] else ""; o+=f'<option value="{r["id"]}"{s}>@{r["name"]}</option>'
         return o
-    ck=lambda k,v:"checked" if cfg.get(k)==v else ""
-    body=f'''{nav}<div class="wrap">{_side(gid,"sett")}<main class="main">{_al()}<div class="pt">Einstellungen</div><p class="ps">Alle Bot-Einstellungen für {g.get("name","")}</p>
-<form method="POST">
-<div class="card"><div class="ct">🔧 Allgemein</div>
-<div class="fg"><label class="lbl">Prefix</label><input name="prefix" class="inp" value="{cfg.get("prefix","!")}" maxlength="5" style="max-width:100px"></div>
-<div class="fg"><label class="lbl">Anti-Raid</label><select name="anti_raid" class="sel" style="max-width:200px"><option value="0" {"selected" if not cfg.get("anti_raid") else ""}>Aus</option><option value="1" {"selected" if cfg.get("anti_raid") else ""}>An</option></select></div>
-<div class="fg"><label class="lbl">Slow Joiner Schutz (Minuten, 0=aus)</label><input name="slow_joiner_minutes" type="number" class="inp" value="{cfg.get("slow_joiner_minutes",0)}" style="max-width:120px"></div>
-<div class="fg"><label class="lbl">Welcome DM</label><select name="welcome_dm" class="sel" style="max-width:200px"><option value="0" {"selected" if not cfg.get("welcome_dm") else ""}>Aus</option><option value="1" {"selected" if cfg.get("welcome_dm") else ""}>An</option></select></div>
-</div>
-<div class="card"><div class="ct">👋 Willkommen & Abschied</div>
-<div class="fg"><label class="lbl">Willkommen-Kanal</label><select name="welcome_channel" class="sel">{co(cfg.get("welcome_channel",""),tch)}</select></div>
-<div class="fg"><label class="lbl">Willkommen-Nachricht</label><textarea name="welcome_msg" class="ta">{cfg.get("welcome_msg","")}</textarea></div>
-<div class="fg"><label class="lbl">Abschied-Kanal</label><select name="goodbye_channel" class="sel">{co(cfg.get("goodbye_channel",""),tch)}</select></div>
-<div class="fg"><label class="lbl">Abschied-Nachricht</label><textarea name="goodbye_msg" class="ta">{cfg.get("goodbye_msg","")}</textarea></div>
-<div class="fg"><label class="lbl">Auto-Rolle</label><select name="auto_role" class="sel">{ro(cfg.get("auto_role",""))}</select></div>
-</div>
-<div class="card"><div class="ct">🔐 Verify & Rollen</div>
-<div class="fg"><label class="lbl">Verify-Rolle</label><select name="verify_role" class="sel">{ro(cfg.get("verify_role",""))}</select></div>
-</div>
-<div class="card"><div class="ct">📋 Logging & Kanäle</div>
-<div class="fg"><label class="lbl">Mod-Log Kanal</label><select name="mod_log" class="sel">{co(cfg.get("mod_log",""),tch)}</select></div>
-<div class="fg"><label class="lbl">Suggest Kanal</label><select name="suggest_channel" class="sel">{co(cfg.get("suggest_channel",""),tch)}</select></div>
-<div class="fg"><label class="lbl">Geburtstags-Kanal</label><select name="birthday_channel" class="sel">{co(cfg.get("birthday_channel",""),tch)}</select></div>
-<div class="fg"><label class="lbl">Starboard Kanal</label><select name="starboard_channel" class="sel">{co(cfg.get("starboard_channel",""),tch)}</select></div>
-<div class="fg"><label class="lbl">Starboard Min. Sterne</label><input name="starboard_min" type="number" class="inp" value="{cfg.get("starboard_min",3)}" style="max-width:100px"></div>
-</div>
-<div class="card"><div class="ct">🎫 Ticket</div>
-<div class="fg"><label class="lbl">Ticket Kategorie</label><select name="ticket_category" class="sel"><option value="">-- Keine --</option>{"".join((f'<option value="{c["id"]}" ' + ('selected' if str(cfg.get("ticket_category",""))==c["id"] else '') + f'>{c["name"]}</option>') for c in chs if c.get("type")==4)}</select></div>
-<div class="fg"><label class="lbl">Ticket Team-Rolle</label><select name="ticket_team_role" class="sel">{ro(cfg.get("ticket_team_role",""))}</select></div>
-</div>
-<button type="submit" class="btn bp">💾 Speichern</button>
-</form></main></div>'''
+    # FIX: extract cfg values before f-strings to avoid nested quote issues
+    cfg_prefix=cfg.get("prefix","!")
+    cfg_sj=cfg.get("slow_joiner_minutes",0)
+    cfg_sb_min=cfg.get("starboard_min",3)
+    cfg_anti_raid=cfg.get("anti_raid",False)
+    cfg_welcome_dm=cfg.get("welcome_dm",False)
+    cfg_welcome_msg=cfg.get("welcome_msg","")
+    cfg_goodbye_msg=cfg.get("goodbye_msg","")
+    anti_raid_sel0="selected" if not cfg_anti_raid else ""
+    anti_raid_sel1="selected" if cfg_anti_raid else ""
+    welcome_dm_sel0="selected" if not cfg_welcome_dm else ""
+    welcome_dm_sel1="selected" if cfg_welcome_dm else ""
+    ticket_cat_opts="<option value=''>-- Keine --</option>"+"".join((f'<option value="{c["id"]}" '+('selected' if str(cfg.get("ticket_category",""))==c["id"] else "")+f'>{c["name"]}</option>') for c in chs if c.get("type")==4)
+    body=(nav+'<div class="wrap">'+_side(gid,"sett")+'<main class="main">'+_al()+
+        f'<div class="pt">Einstellungen</div><p class="ps">Alle Bot-Einstellungen für {g.get("name","")}</p>'
+        '<form method="POST">'
+        '<div class="card"><div class="ct">&#128295; Allgemein</div>'
+        f'<div class="fg"><label class="lbl">Prefix</label><input name="prefix" class="inp" value="{cfg_prefix}" maxlength="5" style="max-width:100px"></div>'
+        f'<div class="fg"><label class="lbl">Anti-Raid</label><select name="anti_raid" class="sel" style="max-width:200px"><option value="0" {anti_raid_sel0}>Aus</option><option value="1" {anti_raid_sel1}>An</option></select></div>'
+        f'<div class="fg"><label class="lbl">Slow Joiner Schutz (Minuten, 0=aus)</label><input name="slow_joiner_minutes" type="number" class="inp" value="{cfg_sj}" style="max-width:120px"></div>'
+        f'<div class="fg"><label class="lbl">Welcome DM</label><select name="welcome_dm" class="sel" style="max-width:200px"><option value="0" {welcome_dm_sel0}>Aus</option><option value="1" {welcome_dm_sel1}>An</option></select></div>'
+        '</div>'
+        '<div class="card"><div class="ct">&#128075; Willkommen &amp; Abschied</div>'
+        f'<div class="fg"><label class="lbl">Willkommen-Kanal</label><select name="welcome_channel" class="sel">{co(cfg.get("welcome_channel",""),tch)}</select></div>'
+        f'<div class="fg"><label class="lbl">Willkommen-Nachricht</label><textarea name="welcome_msg" class="ta">{cfg_welcome_msg}</textarea></div>'
+        f'<div class="fg"><label class="lbl">Abschied-Kanal</label><select name="goodbye_channel" class="sel">{co(cfg.get("goodbye_channel",""),tch)}</select></div>'
+        f'<div class="fg"><label class="lbl">Abschied-Nachricht</label><textarea name="goodbye_msg" class="ta">{cfg_goodbye_msg}</textarea></div>'
+        f'<div class="fg"><label class="lbl">Auto-Rolle</label><select name="auto_role" class="sel">{ro(cfg.get("auto_role",""))}</select></div>'
+        '</div>'
+        '<div class="card"><div class="ct">&#128274; Verify &amp; Rollen</div>'
+        f'<div class="fg"><label class="lbl">Verify-Rolle</label><select name="verify_role" class="sel">{ro(cfg.get("verify_role",""))}</select></div>'
+        '</div>'
+        '<div class="card"><div class="ct">&#128203; Logging &amp; Kanäle</div>'
+        f'<div class="fg"><label class="lbl">Mod-Log Kanal</label><select name="mod_log" class="sel">{co(cfg.get("mod_log",""),tch)}</select></div>'
+        f'<div class="fg"><label class="lbl">Suggest Kanal</label><select name="suggest_channel" class="sel">{co(cfg.get("suggest_channel",""),tch)}</select></div>'
+        f'<div class="fg"><label class="lbl">Geburtstags-Kanal</label><select name="birthday_channel" class="sel">{co(cfg.get("birthday_channel",""),tch)}</select></div>'
+        f'<div class="fg"><label class="lbl">Starboard Kanal</label><select name="starboard_channel" class="sel">{co(cfg.get("starboard_channel",""),tch)}</select></div>'
+        f'<div class="fg"><label class="lbl">Starboard Min. Sterne</label><input name="starboard_min" type="number" class="inp" value="{cfg_sb_min}" style="max-width:100px"></div>'
+        '</div>'
+        '<div class="card"><div class="ct">&#127915; Ticket</div>'
+        f'<div class="fg"><label class="lbl">Ticket Kategorie</label><select name="ticket_category" class="sel">{ticket_cat_opts}</select></div>'
+        f'<div class="fg"><label class="lbl">Ticket Team-Rolle</label><select name="ticket_team_role" class="sel">{ro(cfg.get("ticket_team_role",""))}</select></div>'
+        '</div>'
+        '<button type="submit" class="btn bp">&#128190; Speichern</button>'
+        '</form></main></div>')
     return pg(body)
 
 @fa.route("/ping")
