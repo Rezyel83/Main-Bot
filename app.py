@@ -1,12 +1,9 @@
 import os, time
 from datetime import timedelta
 from flask import Flask, session, redirect, url_for
-from urllib.parse import quote
 import requests as hr
 
 DAPI = "https://discord.com/api/v10"
-
-# ── Shared helpers (used by all dashboard cogs) ──────────────
 _ugc: dict = {}
 _bgc: tuple = ([], 0.0)
 _GTTL = 60
@@ -42,7 +39,6 @@ def bguilds() -> list:
     return d
 
 def get_member_name(guild_id, user_id, bot=None):
-    """Try to get username from bot cache, fallback to API, fallback to ID"""
     if bot:
         g = bot.get_guild(int(guild_id))
         if g:
@@ -62,7 +58,6 @@ def runasync(coro, bot, timeout=6):
     except Exception:
         return None
 
-# ── CSS (shared across all pages) ───────────────────────────
 SHARED_CSS = """
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--r:#ef4444;--rd:#dc2626;--bg:#0f0f0f;--bg2:#1a1a1a;--bg3:#262626;--tx:#fff;--tx2:#a1a1aa;--bdr:#333;--or:#f97316;--ord:#ea6c00}
@@ -70,7 +65,6 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);min-h
 a{color:inherit;text-decoration:none}
 .nav{background:var(--bg2);border-bottom:1px solid var(--bdr);padding:.875rem 1.5rem;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
 .logo{font-size:1.1rem;font-weight:700;color:var(--r)}
-.logo.orange{color:var(--or)}
 .nav-r{display:flex;gap:.75rem;align-items:center;color:var(--tx2)}
 .wrap{display:flex;min-height:calc(100vh - 53px)}
 .side{width:220px;background:var(--bg2);border-right:1px solid var(--bdr);padding:1rem .75rem;flex-shrink:0}
@@ -176,7 +170,6 @@ def alerts():
 
 def sidebar(gid, active, orange=False):
     cls = "orange-nav" if orange else ""
-    color_cls = "orange" if orange else ""
     links = [
         ("📊", "Übersicht", "ov"),
         ("🛡️", "Moderation", "mod"),
@@ -219,7 +212,6 @@ def guild_nav(gid, bot=None):
         f'</div></nav>'
     ), g
 
-# ── App Factory ──────────────────────────────────────────────
 def create_app(bot_instance):
     app = Flask(__name__)
     app.secret_key = os.getenv("SECRET_KEY", "")
@@ -230,62 +222,24 @@ def create_app(bot_instance):
     )
     app.bot = bot_instance
 
-    # Load all dashboard blueprints
     import importlib
-    auth         = importlib.import_module("dashboard.auth")
-    overview     = importlib.import_module("dashboard.overview")
-    moderation   = importlib.import_module("dashboard.moderation")
-    economy      = importlib.import_module("dashboard.economy")
-    giveaways    = importlib.import_module("dashboard.giveaways")
-    suggestions  = importlib.import_module("dashboard.suggestions")
-    team         = importlib.import_module("dashboard.team")
-    applications = importlib.import_module("dashboard.applications")
-    rss          = importlib.import_module("dashboard.rss")
-    rl_teams     = importlib.import_module("dashboard.rl_teams")
-    notifications  = importlib.import_module("dashboard.notifications")
-    channel_perms  = importlib.import_module("dashboard.channel_perms")
-    channels       = importlib.import_module("dashboard.channels")
-    mod_logs       = importlib.import_module("dashboard.mod_logs")
-    settings       = importlib.import_module("dashboard.settings")
-    roles_mod      = importlib.import_module("dashboard.roles")
-    counting_mod   = importlib.import_module("dashboard.counting")
-
-    app.register_blueprint(auth.bp)
-    app.register_blueprint(overview.bp)
-    app.register_blueprint(moderation.bp)
-    app.register_blueprint(economy.bp)
-    app.register_blueprint(giveaways.bp)
-    app.register_blueprint(suggestions.bp)
-    app.register_blueprint(team.bp)
-    app.register_blueprint(applications.bp)
-    app.register_blueprint(rss.bp)
-    app.register_blueprint(rl_teams.bp)
-    app.register_blueprint(notifications.bp)
-    app.register_blueprint(channel_perms.bp)
-    app.register_blueprint(channels.bp)
-    app.register_blueprint(mod_logs.bp)
-    app.register_blueprint(settings.bp)
-    app.register_blueprint(roles_mod.bp)
-    app.register_blueprint(counting_mod.bp)
-
-    for _mod in ["rl_bracket", "rl_public"]:
+    for mod in ["auth","overview","moderation","economy","giveaways","suggestions","team",
+                "applications","rss","rl_teams","notifications","channel_perms","channels",
+                "mod_logs","settings","roles","counting","rl_bracket"]:
         try:
-            import importlib as _il
-            _m = _il.import_module(f"dashboard.{_mod}")
-            app.register_blueprint(_m.bp)
-        except Exception as _e:
-            print(f"Optional blueprint {_mod} skipped: {_e}")
+            m = importlib.import_module(f"dashboard.{mod}")
+            app.register_blueprint(m.bp)
+        except Exception as e:
+            print(f"Dashboard import error {mod}: {e}")
 
     from flask import jsonify
     from datetime import datetime
 
     @app.route("/")
-    def idx():
-        return redirect(url_for("auth.login"))
+    def idx(): return redirect(url_for("auth.login"))
 
     @app.route("/ping")
-    def ping():
-        return jsonify({"status": "alive", "time": datetime.utcnow().isoformat()})
+    def ping(): return jsonify({"status": "alive", "time": datetime.utcnow().isoformat()})
 
     @app.route("/health")
     def health():
@@ -294,22 +248,16 @@ def create_app(bot_instance):
 
     @app.route("/api/bot-status")
     def bot_status():
-        import requests as _hr
+        import requests as _hr, time as _t
         main_ok = bot_instance.is_ready()
         ping = round(bot_instance.latency * 1000) if main_ok else -1
-        # Check level bot
-        level_ok = False
-        level_ping = -1
+        level_ok = False; level_ping = -1
         try:
-            import time as _t
             t0 = _t.monotonic()
             r = _hr.get("https://level-bot-h7jj.onrender.com/health", timeout=5)
             level_ping = round((_t.monotonic() - t0) * 1000)
             level_ok = r.status_code == 200
         except: pass
-        return jsonify({
-            "main": {"online": main_ok, "ping": ping},
-            "level": {"online": level_ok, "ping": level_ping},
-        })
+        return jsonify({"main": {"online": main_ok, "ping": ping}, "level": {"online": level_ok, "ping": level_ping}})
 
     return app
